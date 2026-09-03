@@ -18,6 +18,10 @@ os.makedirs(DATA_DIR, exist_ok=True)
 
 DB_PATH = os.environ.get("RECLIP_DB", os.path.join(DATA_DIR, "reclip.db"))
 RETENTION = int(os.environ.get("RECLIP_RETENTION", 24 * 3600))
+# A 1440p film over a domestic line does not fit in five minutes, which is what
+# the upstream default allowed. The download runs in its own thread, so this
+# does not tie up a gunicorn worker.
+DOWNLOAD_TIMEOUT = int(os.environ.get("RECLIP_DOWNLOAD_TIMEOUT", 20 * 60))
 # A pin does not exempt a file, it moves its deadline within a limit the admin
 # still owns. Otherwise the disk stops being bounded.
 PIN_RETENTION = int(os.environ.get("RECLIP_PIN_RETENTION", 30 * 24 * 3600))
@@ -298,7 +302,8 @@ def run_download(job_id, url, format_choice, format_id, title):
     cmd += ["--", url]
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        result = subprocess.run(cmd, capture_output=True, text=True,
+                                timeout=DOWNLOAD_TIMEOUT)
         if result.returncode != 0:
             update_entry(job_id, status="error", error=result.stderr.strip().split("\n")[-1])
             return
@@ -325,7 +330,8 @@ def run_download(job_id, url, format_choice, format_id, title):
 
         update_entry(job_id, status="done", path=chosen, filename=filename, error=None)
     except subprocess.TimeoutExpired:
-        update_entry(job_id, status="error", error="Download timed out (5 min limit)")
+        update_entry(job_id, status="error",
+                     error=f"Download timed out ({DOWNLOAD_TIMEOUT // 60} min limit)")
     except Exception as e:
         update_entry(job_id, status="error", error=str(e))
 
