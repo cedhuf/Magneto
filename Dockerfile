@@ -1,4 +1,6 @@
-FROM python:3.12-slim
+# Fully qualified: podman has no unqualified-search registry configured, so a
+# short name does not resolve. Docker reads this the same way.
+FROM docker.io/library/python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
