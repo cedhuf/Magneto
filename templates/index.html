@@ -26,13 +26,8 @@
         <p>Free media downloader</p>
       </div>
       <div class="brand-actions">
-        <div class="user-menu" id="userMenu" hidden>
-          <button class="text-btn menu-trigger" id="who" onclick="toggleMenu()" type="button"></button>
-          <div class="menu" id="menu" hidden>
-            <a class="menu-item" id="adminLink" href="/admin" hidden>Admin</a>
-            <a class="menu-item" id="logoutLink" href="#" hidden>Sign out</a>
-          </div>
-        </div>
+        <a class="text-btn" id="who" hidden></a>
+        <a class="text-btn" id="logoutLink" href="#" hidden>Sign out</a>
         <a class="text-btn" id="soloAdmin" href="/admin" hidden>Admin</a>
         <button class="text-btn theme-btn" id="theme-btn" onclick="cycleTheme()" type="button"></button>
       </div>
@@ -513,8 +508,10 @@
         }
         const who = document.getElementById('who');
         who.textContent = me.user;
-        document.getElementById('userMenu').hidden = false;
-        document.getElementById('adminLink').hidden = !me.admin;
+        who.hidden = false;
+        // An admin's own name is the way in. For everyone else it stays a
+        // label: no href means nothing to click and nothing to discover.
+        if (me.admin) who.href = '/admin';
         if (me.logout_url) {
           const link = document.getElementById('logoutLink');
           link.href = me.logout_url;
@@ -522,21 +519,6 @@
         }
       } catch (e) {}
     }
-
-    function toggleMenu() {
-      const menu = document.getElementById('menu');
-      menu.hidden = !menu.hidden;
-    }
-
-    document.addEventListener('click', e => {
-      const menu = document.getElementById('menu');
-      if (!menu.hidden && !document.getElementById('userMenu').contains(e.target)) {
-        menu.hidden = true;
-      }
-    });
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') document.getElementById('menu').hidden = true;
-    });
 
     loadMe();
     restoreEntries();

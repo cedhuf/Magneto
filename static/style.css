@@ -127,6 +127,10 @@ body::after {
   padding-left: 14px;
   margin-left: 2px;
   border-left: 1px solid var(--card-border);
+  /* Room for the longest of Auto, Light and Dark, so cycling does not shift
+     the row. The font is monospace, hence ch. */
+  min-width: calc(5ch + 14px);
+  text-align: right;
 }
 .brand h1 {
   font-family: 'Instrument Serif', serif;
@@ -674,36 +678,3 @@ audio.player-media {
 .icon-btn.on { color: var(--accent); }
 .icon-btn.danger:hover { color: var(--error); }
 
-/* User menu */
-.user-menu { position: relative; }
-.menu-trigger {
-  border: none;
-  background: transparent;
-  font-family: 'DM Mono', monospace;
-  cursor: pointer;
-}
-.menu-trigger::after { content: ' \25be'; }
-.menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 8px);
-  z-index: 20;
-  min-width: 140px;
-  padding: 5px;
-  border: 1.5px solid var(--card-border);
-  border-radius: 10px;
-  background: var(--card);
-  display: flex;
-  flex-direction: column;
-}
-.menu-item {
-  padding: 8px 10px;
-  border-radius: 6px;
-  font-size: 0.72rem;
-  color: var(--muted);
-  text-decoration: none;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-.menu-item:hover { color: var(--fg); background: var(--fg-wash); }
