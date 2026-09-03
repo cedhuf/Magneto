@@ -51,6 +51,11 @@ Files are temporary, the list is not. A file is deleted once it reaches
 so the download can be started again from the same card with one click. Both
 live in `/app/data` and `/app/downloads`, which is all a volume needs to cover.
 
+Pin an entry to keep its file until `RECLIP_PIN_RETENTION` instead. That moves
+the deadline to a longer one the admin still owns, rather than exempting the
+file, which is what keeps the disk bounded. Delete an entry and both the file
+and the row go at once.
+
 ## Accounts
 
 With `RECLIP_AUTH=none`, the default, everything belongs to one implicit user
@@ -83,6 +88,8 @@ date rather than stored.
 | `RECLIP_ADMIN_GROUP` | `admin` | Group name granting admin, matched against `Remote-Groups`. Ignored when `RECLIP_AUTH=none`, where the only user is admin |
 | `RECLIP_LOGOUT_URL` | empty | Where the "Sign out" link points. The session belongs to the proxy, so this is its logout URL; empty hides the link |
 | `RECLIP_RETENTION` | `86400` | Seconds a downloaded file is kept, counted from the file's date. Its entry stays afterwards |
+| `RECLIP_PIN_RETENTION` | `2592000` | Seconds a pinned file is kept. A pin moves the deadline, it does not lift it, so the disk stays bounded |
+| `RECLIP_HISTORY_MAX` | `200` | Entries kept per user. Older ones are dropped, pinned ones never |
 | `RECLIP_DB` | `data/reclip.db` | SQLite file. Put it on the same volume as the downloads, not inside the downloads directory |
 | `RECLIP_BIND` | `0.0.0.0:8899` | What gunicorn listens on. In proxy mode, `127.0.0.1:8899` when the proxy is on the same host; otherwise the reachable address, with the port firewalled to the proxy |
 | `RECLIP_NO_UPDATE` | unset | Set to any value to skip the yt-dlp update at container start. There is no good reason to: extractors break every few weeks and the update is the fix |

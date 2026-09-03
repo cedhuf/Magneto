@@ -665,3 +665,22 @@ audio.player-media {
   .controls { flex-wrap: wrap; }
   .fetch-btn { width: 100%; }
 }
+
+/* Per-entry actions */
+.icon-btn {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+.icon-btn svg { width: 14px; height: 14px; }
+.icon-btn:hover { color: var(--fg); background: var(--fg-wash); }
+.icon-btn.on { color: var(--accent); }
+.icon-btn.danger:hover { color: var(--error); }

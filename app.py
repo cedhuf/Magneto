@@ -18,6 +18,10 @@ os.makedirs(DATA_DIR, exist_ok=True)
 
 DB_PATH = os.environ.get("RECLIP_DB", os.path.join(DATA_DIR, "reclip.db"))
 RETENTION = int(os.environ.get("RECLIP_RETENTION", 24 * 3600))
+# A pin does not exempt a file, it moves its deadline within a limit the admin
+# still owns. Otherwise the disk stops being bounded.
+PIN_RETENTION = int(os.environ.get("RECLIP_PIN_RETENTION", 30 * 24 * 3600))
+HISTORY_MAX = int(os.environ.get("RECLIP_HISTORY_MAX", 200))
 SWEEP_INTERVAL = 60
 
 # "proxy" reads the identity a forward_auth proxy puts in front of us. Anything
@@ -58,6 +62,9 @@ MIGRATIONS = [
         created_at REAL NOT NULL
     );
     CREATE INDEX entries_owner ON entries (owner, created_at DESC);
+    """,
+    """
+    ALTER TABLE entries ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
     """,
 ]
 
@@ -117,12 +124,16 @@ def update_entry(job_id, **fields):
                      (*fields.values(), job_id))
 
 
+def retention_for(row):
+    return PIN_RETENTION if row["pinned"] else RETENTION
+
+
 def seconds_left(row):
     """Seconds until the sweep takes this row's file."""
     if not row["path"]:
         return 0
     try:
-        deadline = os.path.getmtime(row["path"]) + RETENTION
+        deadline = os.path.getmtime(row["path"]) + retention_for(row)
     except OSError:
         return 0
     return max(0, int(deadline - time.time()))
@@ -139,6 +150,7 @@ def entry_json(row):
         "filename": row["filename"],
         "status": row["status"],
         "error": row["error"],
+        "pinned": bool(row["pinned"]),
         "has_file": bool(row["path"]) and os.path.exists(row["path"]),
         "expires_in": seconds_left(row),
     }
@@ -189,7 +201,8 @@ def sweep_downloads():
     """
     now = time.time()
     with connect() as conn:
-        known = {r["job_id"] for r in conn.execute("SELECT job_id FROM entries")}
+        known = {r["job_id"]: r["pinned"] for r in
+                 conn.execute("SELECT job_id, pinned FROM entries")}
 
     for path in glob.glob(os.path.join(DOWNLOAD_DIR, "*")):
         job_id = os.path.basename(path).split(".")[0]
@@ -197,11 +210,33 @@ def sweep_downloads():
             age = now - os.path.getmtime(path)
         except OSError:
             continue
-        if job_id in known and age < RETENTION:
-            continue
+        if job_id in known:
+            if age < (PIN_RETENTION if known[job_id] else RETENTION):
+                continue
         remove_quietly(path)
         if job_id in known:
             update_entry(job_id, path=None)
+
+    trim_history()
+
+
+def trim_history():
+    """Keep the newest HISTORY_MAX entries per user.
+
+    A row is a few bytes, but without a ceiling the list grows for the life of
+    the instance. Pinned entries are never trimmed: pinning says keep it.
+    """
+    with connect() as conn:
+        stale = conn.execute(
+            "SELECT job_id, path FROM entries WHERE pinned = 0 AND job_id NOT IN ("
+            "  SELECT job_id FROM ("
+            "    SELECT job_id, row_number() OVER ("
+            "      PARTITION BY owner ORDER BY created_at DESC) AS rank FROM entries"
+            "  ) WHERE rank <= ?)", (HISTORY_MAX,)).fetchall()
+        for row in stale:
+            if row["path"]:
+                remove_quietly(row["path"])
+            conn.execute("DELETE FROM entries WHERE job_id = ?", (row["job_id"],))
 
 
 def janitor():
@@ -350,6 +385,28 @@ def list_entries():
             "SELECT * FROM entries WHERE owner = ? ORDER BY created_at", (owner,)
         ).fetchall()
     return jsonify({"entries": [entry_json(r) for r in rows], "user": owner})
+
+
+@app.route("/api/entries/<job_id>/pin", methods=["POST"])
+def pin_entry(job_id):
+    row = get_entry(job_id, current_user())
+    if row is None:
+        return jsonify({"error": "Not found"}), 404
+    pinned = 1 if request.json.get("pinned") else 0
+    update_entry(job_id, pinned=pinned)
+    return jsonify(entry_json(get_entry(job_id)))
+
+
+@app.route("/api/entries/<job_id>", methods=["DELETE"])
+def delete_entry(job_id):
+    row = get_entry(job_id, current_user())
+    if row is None:
+        return jsonify({"error": "Not found"}), 404
+    if row["path"]:
+        remove_quietly(row["path"])
+    with connect() as conn:
+        conn.execute("DELETE FROM entries WHERE job_id = ?", (job_id,))
+    return jsonify({"ok": True})
 
 
 @app.route("/api/info", methods=["POST"])
