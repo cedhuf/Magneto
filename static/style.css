@@ -105,7 +105,7 @@ body::after {
 }
 
 .page {
-  max-width: 760px;
+  max-width: 1000px;
   margin: 0 auto;
   padding: 60px 24px 80px;
 }
