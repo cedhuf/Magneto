@@ -41,21 +41,11 @@ jobs:
       - name: Push
         run: |
           set -eu
-          # The run token may already open the registry, which would save a
-          # dedicated secret. Undocumented, so keep the fallback until a green
-          # run proves it.
-          if printf '%s' '${{ github.token }}' \
-              | podman login --username "$GITHUB_ACTOR" --password-stdin git.thehuf.uk
-          then
-            echo "registry: authenticated with the run token"
-          elif [ -n '${{ secrets.REGISTRY_TOKEN }}' ]; then
-            echo "registry: run token refused, falling back to REGISTRY_TOKEN"
-            printf '%s' '${{ secrets.REGISTRY_TOKEN }}' \
-              | podman login --username "$GITHUB_ACTOR" --password-stdin git.thehuf.uk
-          else
-            echo "registry: run token refused and no REGISTRY_TOKEN secret is set" >&2
-            exit 1
-          fi
+          # REGISTRY_TOKEN needs package read+write. The run token is not
+          # enough: its login succeeds, then the blob upload is refused with
+          # "authentication required" (forgejo#1296, still true in 15.0.7).
+          printf '%s' '${{ secrets.REGISTRY_TOKEN }}' \
+            | podman login --username "$GITHUB_ACTOR" --password-stdin git.thehuf.uk
           podman push "$IMAGE:$SHA"
           podman push "$IMAGE:latest"
           case "$GITHUB_REF" in
