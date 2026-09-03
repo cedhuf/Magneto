@@ -104,10 +104,18 @@
       modal.hidden = false;
       document.body.style.overflow = 'hidden';
     }
+    function youtubeId(video) {
+      if (video.id) return video.id;
+      try {
+        const url = new URL(video.url);
+        return url.searchParams.get('v') || (url.hostname === 'youtu.be' ? url.pathname.slice(1) : '');
+      } catch (e) { return ''; }
+    }
     function playVideo(index) {
       const video = feedVideos[index];
-      if (!video.id) return;
-      document.getElementById('modalMedia').innerHTML = `<iframe class="feed-player" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(video.id)}?autoplay=1" title="${esc(video.title)}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
+      const id = youtubeId(video);
+      if (!id) return;
+      document.getElementById('modalMedia').innerHTML = `<iframe class="feed-player" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1" title="${esc(video.title)}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
     }
     function closeVideo() {
       document.getElementById('modal').hidden = true;

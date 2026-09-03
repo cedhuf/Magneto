@@ -373,16 +373,11 @@ def youtube_videos_url(url):
 
 
 def fetch_channel(url):
-    """Return the five newest videos with their actual metadata.
-
-    Flat playlist entries are quick but YouTube routinely leaves their publish
-    dates blank. There are only five entries, so resolving them is the small,
-    reliable trade-off for a feed that can be sorted and dated.
-    """
+    """Return the five newest videos without opening every video separately."""
     videos_url = youtube_videos_url(url)
     if not videos_url:
         raise ValueError("Please enter a YouTube channel URL")
-    cmd = ["yt-dlp", "--playlist-end", "5", "-J", "--", videos_url]
+    cmd = ["yt-dlp", "--flat-playlist", "--playlist-end", "5", "-J", "--", videos_url]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
     if result.returncode != 0:
         raise ValueError(result.stderr.strip().split("\n")[-1])
