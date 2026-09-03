@@ -66,6 +66,9 @@ MIGRATIONS = [
     """
     ALTER TABLE entries ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
     """,
+    """
+    ALTER TABLE entries ADD COLUMN formats TEXT;
+    """,
 ]
 
 
@@ -160,6 +163,7 @@ def entry_json(row):
         "thumbnail": row["thumbnail"],
         "format": row["format"],
         "format_id": row["format_id"],
+        "formats": json.loads(row["formats"]) if row["formats"] else [],
         "filename": row["filename"],
         "status": row["status"],
         "error": row["error"],
@@ -422,25 +426,29 @@ def delete_entry(job_id):
     return jsonify({"ok": True})
 
 
-def remember(owner, url, title, thumbnail):
+def remember(owner, url, title, thumbnail, formats):
     """Record a fetched URL, so it survives the tab without being downloaded.
 
     Fetching the same URL twice returns the same row rather than a second card,
-    which also means a URL already downloaded comes back with its state.
+    which also means a URL already downloaded comes back with its state. The
+    quality list is stored with it, otherwise a restored card could only offer
+    the default format.
     """
+    encoded = json.dumps(formats)
     with connect() as conn:
         row = conn.execute(
             "SELECT job_id FROM entries WHERE owner = ? AND url = ?"
             " ORDER BY created_at DESC LIMIT 1", (owner, url)).fetchone()
         if row:
-            conn.execute("UPDATE entries SET title = ?, thumbnail = ? WHERE job_id = ?",
-                         (title, thumbnail, row["job_id"]))
+            conn.execute("UPDATE entries SET title = ?, thumbnail = ?, formats = ?"
+                         " WHERE job_id = ?",
+                         (title, thumbnail, encoded, row["job_id"]))
             return row["job_id"]
         job_id = uuid.uuid4().hex[:10]
         conn.execute(
-            "INSERT INTO entries (job_id, owner, url, title, thumbnail, status,"
-            " created_at) VALUES (?, ?, ?, ?, ?, 'ready', ?)",
-            (job_id, owner, url, title, thumbnail, time.time()))
+            "INSERT INTO entries (job_id, owner, url, title, thumbnail, formats,"
+            " status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'ready', ?)",
+            (job_id, owner, url, title, thumbnail, encoded, time.time()))
         return job_id
 
 
@@ -483,7 +491,7 @@ def get_info():
         title = info.get("title", "")
         thumbnail = info.get("thumbnail", "")
         return jsonify({
-            "job_id": remember(owner, url, title, thumbnail),
+            "job_id": remember(owner, url, title, thumbnail, formats),
             "title": title,
             "thumbnail": thumbnail,
             "duration": info.get("duration"),
