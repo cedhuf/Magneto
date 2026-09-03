@@ -67,6 +67,9 @@ YouTube, TikTok, Instagram, Twitter/X, Reddit, Facebook, Vimeo, Twitch, Dailymot
 - **Backend:** Python + Flask (~150 lines)
 - **Frontend:** Vanilla HTML/CSS/JS (single file, no build step)
 - **Download engine:** [yt-dlp](https://github.com/yt-dlp/yt-dlp) + [ffmpeg](https://ffmpeg.org/)
+- **JavaScript runtime:** [deno](https://deno.com/), shipped in the image because
+  yt-dlp needs an engine to solve YouTube's player challenge. Without one it
+  silently falls back to clients YouTube may refuse, and formats go missing.
 - **Dependencies:** 2 (Flask, yt-dlp)
 
 ## Disclaimer
