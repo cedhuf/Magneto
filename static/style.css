@@ -422,7 +422,7 @@ textarea::placeholder { color: var(--muted); }
 
 .card.expanded { align-items: flex-start; }
 .card.expanded .card-thumb { height: 96px; align-self: auto; }
-.card.expanded .card-side { justify-content: flex-start; }
+.card.expanded .card-side { align-items: flex-start; padding-top: 14px; }
 
 /* Flush to the card's left, top and bottom edges: the card's own radius and
    overflow do the rounding, the image has none of its own. */
@@ -587,16 +587,17 @@ audio.player-media {
 
 /* The action column has a width of its own, so nothing in the text can push
    the buttons around, and the buttons line up down the list. */
+/* One line, icons first. Stacked, a card with a single icon left it orphaned
+   under the button; beside it, it reads as part of the same group. */
 .card-side {
   flex-shrink: 0;
   padding: 12px 14px;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
 }
-.card-icons { display: flex; gap: 2px; }
+.card-icons { display: flex; gap: 2px; margin-right: 4px; }
 .card-note-row { margin-top: 5px; }
 
 /* Folded by default: a row keeps its height until someone asks for more. */
@@ -834,8 +835,8 @@ audio.player-media {
 
 /* Per-entry actions */
 .icon-btn {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
