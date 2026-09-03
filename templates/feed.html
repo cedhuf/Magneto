@@ -54,7 +54,7 @@
       const data = await res.json();
       const videos = document.getElementById('videos');
       videos.innerHTML = data.videos.map(v => `<a class="feed-video" href="/?url=${encodeURIComponent(v.url)}">
-        <div class="feed-thumb">${v.thumbnail ? `<img src="${esc(v.thumbnail)}" alt="">` : ''}${v.duration ? `<span>${duration(v.duration)}</span>` : ''}</div>
+        <div class="feed-thumb">${v.thumbnail ? `<img src="${esc(v.thumbnail)}" alt="">` : ''}${date(v.upload_date) ? `<span class="feed-date">${date(v.upload_date)}</span>` : ''}${v.duration ? `<span class="feed-duration">${duration(v.duration)}</span>` : ''}</div>
         <div class="feed-video-body"><div class="feed-video-title">${esc(v.title)}</div>
         <div class="feed-video-meta">${esc(v.channel)}${date(v.upload_date) ? ` · ${date(v.upload_date)}` : ''}</div></div>
       </a>`).join('');

@@ -412,7 +412,9 @@ textarea::placeholder { color: var(--muted); }
 .feed-video:hover { border-color: var(--muted); transform: translateY(-2px); }
 .feed-thumb { position: relative; aspect-ratio: 16 / 9; background: var(--card-border); }
 .feed-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.feed-thumb span { position: absolute; right: 6px; bottom: 6px; padding: 2px 5px; border-radius: 4px; background: var(--scrim-strong); color: var(--on-scrim); font-size: .58rem; }
+.feed-thumb span { position: absolute; padding: 2px 5px; border-radius: 4px; background: var(--scrim-strong); color: var(--on-scrim); font-size: .58rem; letter-spacing: .04em; text-transform: uppercase; }
+.feed-date { top: 6px; left: 6px; }
+.feed-duration { right: 6px; bottom: 6px; }
 .feed-video-body { padding: 10px 12px 12px; }
 .feed-video-title { font-family: 'Instrument Serif', serif; font-size: 1rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .feed-video-meta { margin-top: 5px; color: var(--muted); font-size: .62rem; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
