@@ -66,12 +66,40 @@ own: the proxy has already done that work.
 > that can reach the port directly can claim to be anyone. `HOST=127.0.0.1`, and
 > let the proxy be the only way in.
 
+## Configuration
+
+Everything is an environment variable, so a compose file is the whole
+configuration and there is no settings screen and no state to migrate. Change a
+value, restart, and it applies at once: deadlines are computed from the file's
+date rather than stored.
+
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `RECLIP_RETENTION` | `86400` | Seconds a downloaded file is kept |
-| `RECLIP_AUTH` | `none` | `none` or `proxy` |
-| `RECLIP_ADMIN_GROUP` | `admin` | Group granting admin, read from `Remote-Groups` |
-| `RECLIP_DB` | `data/reclip.db` | SQLite file |
+| `RECLIP_AUTH` | `none` | `none` for one implicit user, `proxy` to read the identity from a forward-auth proxy. In `proxy` a missing `Remote-User` is a 401, never a fallback |
+| `RECLIP_ADMIN_GROUP` | `admin` | Group name granting admin, matched against `Remote-Groups`. Ignored when `RECLIP_AUTH=none`, where the only user is admin |
+| `RECLIP_RETENTION` | `86400` | Seconds a downloaded file is kept, counted from the file's date. Its entry stays afterwards |
+| `RECLIP_DB` | `data/reclip.db` | SQLite file. Put it on the same volume as the downloads, not inside the downloads directory |
+| `RECLIP_BIND` | `0.0.0.0:8899` | What gunicorn listens on. Use `127.0.0.1:8899` whenever `RECLIP_AUTH=proxy` |
+| `RECLIP_NO_UPDATE` | unset | Set to any value to skip the yt-dlp update at container start. There is no good reason to: extractors break every few weeks and the update is the fix |
+| `HOST` / `PORT` | `127.0.0.1` / `8899` | Only used by `python app.py` and `reclip.sh`. The image goes through gunicorn and reads `RECLIP_BIND` |
+
+### Behind a forward-auth proxy
+
+With Caddy and [tinyauth](https://tinyauth.app), the proxy authenticates and
+copies the identity headers to ReClip:
+
+```caddyfile
+reclip.example.com {
+    forward_auth 127.0.0.1:3610 {
+        uri /api/auth/caddy
+        copy_headers Remote-User Remote-Groups Remote-Email Remote-Name
+    }
+    reverse_proxy 127.0.0.1:8899
+}
+```
+
+with `RECLIP_AUTH=proxy` and `RECLIP_BIND=127.0.0.1:8899` on the container.
+Admin is whoever is in the `admin` group of your identity provider.
 
 ## Supported Sites
 

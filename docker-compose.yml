@@ -7,7 +7,14 @@ services:
       - "8899:8899"
     volumes:
       - reclip-downloads:/app/downloads
+      - reclip-data:/app/data
+    environment:
+      # Personal instance: one implicit user, nothing to log into.
+      # Set to "proxy" behind a forward-auth proxy, and bind to localhost then.
+      RECLIP_AUTH: "none"
+      RECLIP_RETENTION: "86400"
     restart: unless-stopped
 
 volumes:
   reclip-downloads:
+  reclip-data:

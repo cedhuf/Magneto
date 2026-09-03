@@ -27,4 +27,6 @@ ENV PATH=/home/reclip/.local/bin:$PATH
 EXPOSE 8899
 
 ENTRYPOINT ["sh", "/app/docker-entrypoint.sh"]
-CMD ["gunicorn", "-b", "0.0.0.0:8899", "-w", "1", "--threads", "4", "--timeout", "600", "--access-logfile", "-", "app:app"]
+# Shell form so RECLIP_BIND can be set from the compose file. In proxy mode the
+# identity is a header, so the bind address is a security setting, not a detail.
+CMD ["sh", "-c", "exec gunicorn -b \"${RECLIP_BIND:-0.0.0.0:8899}\" -w 1 --threads 4 --timeout 600 --access-logfile - app:app"]
