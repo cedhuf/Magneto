@@ -267,8 +267,9 @@
       } else if (c.status === 'downloading') {
         primary = `<span class="card-status downloading"><span class="spin"></span> Downloading</span>`;
       } else if (c.status === 'done') {
+        // No filename line: it is the title with an extension, and the browser
+        // shows the real name when the file is saved anyway.
         primary = `<button class="card-dl-btn done" onclick="saveCard(${idx})">Save</button>`;
-        note = `<span class="card-status done">${esc(c.filename || '')}</span>`;
       } else if (c.status === 'error') {
         primary = `<button class="card-dl-btn" onclick="dlCard(${idx})">Retry</button>`;
         note = `<span class="card-status error">${esc(friendlyError(c.error || 'Download failed'))}</span>`;

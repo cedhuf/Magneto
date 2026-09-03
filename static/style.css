@@ -113,6 +113,7 @@ body::after {
 .brand {
   margin-bottom: 48px;
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
@@ -135,7 +136,7 @@ body::after {
 }
 .brand h1 {
   font-family: 'Instrument Serif', serif;
-  font-size: 4.2rem;
+  font-size: clamp(2.6rem, 8vw, 4.2rem);
   font-weight: 400;
   letter-spacing: -0.03em;
   line-height: 1;
@@ -322,14 +323,17 @@ textarea::placeholder { color: var(--muted); }
 }
 .history .cards { margin-top: 14px; }
 
+/* One row height for every card, so the thumbnails keep the same shape all the
+   way down the list. min-height rather than height: an error message is allowed
+   to make its own card taller instead of being cut. */
 .card {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  align-items: stretch;
+  min-height: 96px;
   border: 1.5px solid var(--card-border);
   border-radius: var(--radius);
   background: var(--card);
-  padding: 14px;
+  overflow: hidden;
   margin-bottom: 10px;
   animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -338,17 +342,19 @@ textarea::placeholder { color: var(--muted); }
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Flush to the card's left, top and bottom edges: the card's own radius and
+   overflow do the rounding, the image has none of its own. */
 .card-thumb {
-  width: 120px;
-  min-width: 120px;
-  height: 80px;
-  border-radius: 8px;
-  overflow: hidden;
+  width: 170px;
+  min-width: 170px;
+  align-self: stretch;
   background: var(--card-border);
   flex-shrink: 0;
   position: relative;
 }
 .card-thumb img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -356,8 +362,8 @@ textarea::placeholder { color: var(--muted); }
 }
 /* No-thumbnail icon */
 .card-thumb .no-thumb {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -393,6 +399,8 @@ textarea::placeholder { color: var(--muted); }
 /* No hover on touch, so the badge has to stay visible there. */
 @media (hover: none) {
   .thumb-play { opacity: 1; background: var(--scrim-soft); }
+  .icon-btn { width: 40px; height: 40px; }
+  .icon-btn svg { width: 17px; height: 17px; }
 }
 
 /* Player overlay */
@@ -489,6 +497,7 @@ audio.player-media {
 .card-body {
   flex: 1;
   min-width: 0;
+  padding: 12px 16px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -498,15 +507,17 @@ audio.player-media {
    the buttons around, and the buttons line up down the list. */
 .card-side {
   flex-shrink: 0;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  justify-content: center;
   gap: 8px;
 }
 .card-icons { display: flex; gap: 2px; }
-.card-note-row { margin-top: 6px; }
+.card-note-row { margin-top: 5px; }
 .card-note { font-size: 0.68rem; color: var(--muted); }
-.card-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.card-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
 
 /* Remaining time sits on the thumbnail, out of the text flow entirely. */
 .thumb-ttl {
@@ -537,7 +548,6 @@ audio.player-media {
   color: var(--muted);
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  margin-bottom: 8px;
 }
 
 .card-actions {
@@ -582,7 +592,7 @@ audio.player-media {
 }
 
 .q-chip {
-  padding: 4px 10px;
+  padding: 3px 9px;
   border: 1.5px solid var(--card-border);
   border-radius: 6px;
   background: transparent;
@@ -676,14 +686,33 @@ audio.player-media {
 }
 
 /* Mobile */
+@media (max-width: 720px) {
+  .card-thumb { width: 132px; min-width: 132px; }
+  .card-body { padding: 12px; }
+}
+
+/* Stacked, and the image now touches top, left and right instead of left, top
+   and bottom. Same rule, different neighbours. */
 @media (max-width: 500px) {
-  .brand h1 { font-size: 3rem; }
   .page { padding: 40px 16px 60px; }
-  .card { flex-direction: column; gap: 10px; }
+  .brand { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .card {
+    flex-direction: column;
+    min-height: 0;
+  }
   .card-thumb {
     width: 100%;
-    min-width: unset;
-    height: 160px;
+    min-width: 0;
+    height: 180px;
+    align-self: auto;
+  }
+  .card-body { padding: 12px 14px 0; }
+  .card-side {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 12px 14px 14px;
   }
   .card-title { white-space: normal; }
   .controls { flex-wrap: wrap; }
