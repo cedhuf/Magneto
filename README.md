@@ -62,9 +62,13 @@ For a shared one, put a forward-auth proxy in front (tinyauth, Authelia, oauth2
 identity and `Remote-Groups` for the admin role. It implements no OIDC of its
 own: the proxy has already done that work.
 
-> **Bind to localhost in proxy mode.** The identity is a header, so anything
-> that can reach the port directly can claim to be anyone. `HOST=127.0.0.1`, and
-> let the proxy be the only way in.
+> **In proxy mode, the proxy must be the only way in.** The identity is a
+> header, so whatever can reach the port directly can send `Remote-User` and be
+> anyone, proxy bypassed. On one host, bind to loopback with
+> `RECLIP_BIND=127.0.0.1:8899` and the rule holds by construction. Across hosts
+> that is not available: bind to the reachable address and restrict the port to
+> the proxy's IP at the firewall. Same guarantee, but resting on a rule someone
+> can remove by accident rather than on something structural.
 
 ## Configuration
 
@@ -79,7 +83,7 @@ date rather than stored.
 | `RECLIP_ADMIN_GROUP` | `admin` | Group name granting admin, matched against `Remote-Groups`. Ignored when `RECLIP_AUTH=none`, where the only user is admin |
 | `RECLIP_RETENTION` | `86400` | Seconds a downloaded file is kept, counted from the file's date. Its entry stays afterwards |
 | `RECLIP_DB` | `data/reclip.db` | SQLite file. Put it on the same volume as the downloads, not inside the downloads directory |
-| `RECLIP_BIND` | `0.0.0.0:8899` | What gunicorn listens on. Use `127.0.0.1:8899` whenever `RECLIP_AUTH=proxy` |
+| `RECLIP_BIND` | `0.0.0.0:8899` | What gunicorn listens on. In proxy mode, `127.0.0.1:8899` when the proxy is on the same host; otherwise the reachable address, with the port firewalled to the proxy |
 | `RECLIP_NO_UPDATE` | unset | Set to any value to skip the yt-dlp update at container start. There is no good reason to: extractors break every few weeks and the update is the fix |
 | `HOST` / `PORT` | `127.0.0.1` / `8899` | Only used by `python app.py` and `reclip.sh`. The image goes through gunicorn and reads `RECLIP_BIND` |
 
