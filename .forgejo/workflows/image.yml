@@ -5,10 +5,8 @@ name: Container image
 # Docker daemon. JavaScript actions do work here (Node is in the service PATH),
 # so actions/checkout is available if a later workflow wants it.
 
+# Manual only: most commits here do not deserve an image.
 on:
-  push:
-    branches: [main]
-    tags: ["v*"]
   workflow_dispatch:
 
 env:
