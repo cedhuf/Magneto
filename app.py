@@ -81,6 +81,18 @@ MIGRATIONS = [
     ALTER TABLE entries ADD COLUMN description TEXT;
     ALTER TABLE entries ADD COLUMN upload_date TEXT;
     """,
+    """
+    CREATE TABLE subscriptions (
+        owner        TEXT NOT NULL,
+        channel_id   TEXT NOT NULL,
+        channel_url  TEXT NOT NULL,
+        title        TEXT,
+        thumbnail    TEXT,
+        videos       TEXT NOT NULL DEFAULT '[]',
+        refreshed_at REAL NOT NULL DEFAULT 0,
+        PRIMARY KEY (owner, channel_id)
+    );
+    """,
 ]
 
 
@@ -336,25 +348,145 @@ def run_download(job_id, url, format_choice, format_id, title):
         update_entry(job_id, status="error", error=str(e))
 
 
+def is_youtube_channel_url(url):
+    """A feed accepts channel pages only, not arbitrary yt-dlp URLs."""
+    try:
+        host = urlparse(url).hostname or ""
+    except ValueError:
+        return False
+    return host == "youtube.com" or host.endswith(".youtube.com")
+
+
+def fetch_channel(url):
+    """Return the five newest entries without resolving each video separately."""
+    cmd = ["yt-dlp", "--flat-playlist", "--playlist-end", "5", "-J", "--", url]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    if result.returncode != 0:
+        raise ValueError(result.stderr.strip().split("\n")[-1])
+    info = json.loads(result.stdout)
+    channel_id = info.get("channel_id") or info.get("id")
+    if not channel_id:
+        raise ValueError("Could not identify this YouTube channel")
+    videos = []
+    for entry in info.get("entries") or []:
+        video_id = entry.get("id")
+        video_url = entry.get("webpage_url") or entry.get("url")
+        if video_url and not video_url.startswith("http") and video_id:
+            video_url = f"https://www.youtube.com/watch?v={video_id}"
+        if video_url:
+            videos.append({
+                "url": video_url,
+                "title": entry.get("title") or "Untitled",
+                "thumbnail": entry.get("thumbnail") or "",
+                "upload_date": entry.get("upload_date") or "",
+                "duration": entry.get("duration"),
+            })
+    return {
+        "channel_id": str(channel_id),
+        "channel_url": info.get("webpage_url") or url,
+        "title": info.get("channel") or info.get("uploader") or info.get("title") or url,
+        "thumbnail": info.get("channel_thumbnail") or info.get("thumbnail") or "",
+        "videos": videos,
+    }
+
+
+def refresh_subscription(owner, url):
+    channel = fetch_channel(url)
+    with connect() as conn:
+        conn.execute("INSERT INTO subscriptions "
+                     "(owner, channel_id, channel_url, title, thumbnail, videos, refreshed_at) "
+                     "VALUES (?, ?, ?, ?, ?, ?, ?) "
+                     "ON CONFLICT(owner, channel_id) DO UPDATE SET "
+                     "channel_url = excluded.channel_url, title = excluded.title, "
+                     "thumbnail = excluded.thumbnail, videos = excluded.videos, "
+                     "refreshed_at = excluded.refreshed_at",
+                     (owner, channel["channel_id"], channel["channel_url"], channel["title"],
+                      channel["thumbnail"], json.dumps(channel["videos"]), time.time()))
+    return channel
+
+
+def page_context():
+    """What the header needs. Rendered server-side: the identity is known here,
+    so asking for it from the browser only bought a flash of empty header."""
+    return {"auth": AUTH_MODE, "user": current_user(),
+            "admin": is_admin(), "logout_url": LOGOUT_URL}
+
+
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", **page_context())
+
+
+@app.route("/feed")
+def feed_page():
+    return render_template("feed.html", **page_context())
 
 
 @app.route("/api/me")
-def whoami():
-    return jsonify({
-        "user": current_user(),
-        "admin": is_admin(),
-        "auth": AUTH_MODE,
-        "logout_url": LOGOUT_URL,
-    })
+def me():
+    return jsonify(page_context())
+
+
+@app.route("/api/feed")
+def feed():
+    owner = current_user()
+    with connect() as conn:
+        rows = conn.execute("SELECT * FROM subscriptions WHERE owner = ? "
+                            "ORDER BY title COLLATE NOCASE", (owner,)).fetchall()
+    channels = []
+    videos = []
+    for row in rows:
+        channel = dict(row)
+        channel["videos"] = json.loads(channel["videos"])
+        channels.append(channel)
+        videos.extend({**video, "channel": row["title"], "channel_id": row["channel_id"]}
+                      for video in channel["videos"])
+    # YYYYMMDD sorts correctly as a string. Unknown dates naturally sink.
+    videos.sort(key=lambda video: video["upload_date"], reverse=True)
+    return jsonify({"channels": channels, "videos": videos})
+
+
+@app.route("/api/feed/subscriptions", methods=["POST"])
+def subscribe():
+    owner = current_user()
+    url = (request.json or {}).get("url", "").strip()
+    if not is_safe_url(url) or not is_youtube_channel_url(url):
+        return jsonify({"error": "Please enter a YouTube channel URL"}), 400
+    try:
+        return jsonify(refresh_subscription(owner, url))
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": "Timed out fetching channel"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/feed/refresh", methods=["POST"])
+def refresh_feed():
+    owner = current_user()
+    with connect() as conn:
+        urls = [row["channel_url"] for row in conn.execute(
+            "SELECT channel_url FROM subscriptions WHERE owner = ?", (owner,))]
+    errors = []
+    for url in urls:
+        try:
+            refresh_subscription(owner, url)
+        except Exception as e:
+            errors.append(str(e))
+    return jsonify({"ok": not errors, "error": errors[0] if errors else None})
+
+
+@app.route("/api/feed/subscriptions/<channel_id>", methods=["DELETE"])
+def unsubscribe(channel_id):
+    with connect() as conn:
+        conn.execute("DELETE FROM subscriptions WHERE owner = ? AND channel_id = ?",
+                     (current_user(), channel_id))
+    return jsonify({"ok": True})
 
 
 @app.route("/admin")
 def admin_page():
     require_admin()
-    return render_template("admin.html")
+    return render_template("admin.html", **page_context())
 
 
 @app.route("/api/admin/overview")

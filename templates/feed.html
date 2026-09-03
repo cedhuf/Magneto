@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReClip — Feed</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <script>try { var saved = localStorage.getItem('theme'); if (saved === 'dark' || saved === 'light') document.documentElement.dataset.theme = saved; } catch (e) {}</script>
+</head>
+<body>
+  <div class="page">
+    <div class="brand">
+      <div class="brand-text">
+        <h1><a class="brand-link" href="/">Re<em>Clip</em></a></h1>
+        <p>Your YouTube feed</p>
+      </div>
+      <div class="brand-actions">
+        <a class="text-btn" id="who" hidden></a>
+        <a class="text-btn" href="/feed">Feed</a>
+        <a class="text-btn" id="logoutLink" href="#" hidden>Sign out</a>
+        <a class="text-btn" id="soloAdmin" href="/admin" hidden>Admin</a>
+        <button class="text-btn theme-btn" id="theme-btn" onclick="cycleTheme()" type="button"></button>
+      </div>
+    </div>
+
+    <form class="feed-add" id="addForm">
+      <input id="channelUrl" type="url" placeholder="Paste a YouTube channel URL…" required>
+      <button class="fetch-btn" id="addBtn">Add channel</button>
+    </form>
+    <p class="hint" id="message">Add a channel to see its five latest videos.</p>
+
+    <div class="feed-head" id="feedHead" hidden>
+      <span id="videoCount"></span>
+      <button class="link-btn" id="refreshBtn">Refresh feed</button>
+    </div>
+    <div class="feed-grid" id="videos"></div>
+    <div class="subscriptions" id="subscriptions" hidden>
+      <div class="history-head">Channels</div>
+      <div id="channelList"></div>
+    </div>
+  </div>
+
+  <script>
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const esc = s => { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; };
+    function date(s) { return s && s.length === 8 ? `${+s.slice(6)} ${MONTHS[+s.slice(4, 6) - 1]} ${s.slice(0, 4)}` : ''; }
+    function duration(s) { return s ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` : ''; }
+    function message(text, error = false) { const el = document.getElementById('message'); el.textContent = text; el.style.color = error ? 'var(--error)' : ''; }
+
+    async function load() {
+      const res = await fetch('/api/feed');
+      if (!res.ok) return;
+      const data = await res.json();
+      const videos = document.getElementById('videos');
+      videos.innerHTML = data.videos.map(v => `<a class="feed-video" href="/?url=${encodeURIComponent(v.url)}">
+        <div class="feed-thumb">${v.thumbnail ? `<img src="${esc(v.thumbnail)}" alt="">` : ''}${v.duration ? `<span>${duration(v.duration)}</span>` : ''}</div>
+        <div class="feed-video-body"><div class="feed-video-title">${esc(v.title)}</div>
+        <div class="feed-video-meta">${esc(v.channel)}${date(v.upload_date) ? ` · ${date(v.upload_date)}` : ''}</div></div>
+      </a>`).join('');
+      document.getElementById('feedHead').hidden = !data.channels.length;
+      document.getElementById('videoCount').textContent = `${data.videos.length} latest video${data.videos.length === 1 ? '' : 's'}`;
+      const list = document.getElementById('channelList');
+      list.innerHTML = data.channels.map(c => `<div class="channel-row"><span>${esc(c.title)}</span><button class="row-btn" onclick="removeChannel('${esc(c.channel_id)}')">Remove</button></div>`).join('');
+      document.getElementById('subscriptions').hidden = !data.channels.length;
+    }
+
+    document.getElementById('addForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const button = document.getElementById('addBtn');
+      button.disabled = true; button.textContent = 'Adding…'; message('Looking up channel…');
+      try {
+        const res = await fetch('/api/feed/subscriptions', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url: document.getElementById('channelUrl').value})});
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not add channel');
+        document.getElementById('channelUrl').value = ''; message('Channel added.'); await load();
+      } catch (err) { message(err.message, true); }
+      button.disabled = false; button.textContent = 'Add channel';
+    });
+    document.getElementById('refreshBtn').addEventListener('click', async () => {
+      const button = document.getElementById('refreshBtn'); button.disabled = true; button.textContent = 'Refreshing…';
+      const res = await fetch('/api/feed/refresh', {method: 'POST'}); const data = await res.json();
+      message(data.error || 'Feed refreshed.', !!data.error); await load(); button.disabled = false; button.textContent = 'Refresh feed';
+    });
+    async function removeChannel(id) {
+      if (!confirm('Remove this channel from your feed?')) return;
+      await fetch(`/api/feed/subscriptions/${encodeURIComponent(id)}`, {method: 'DELETE'}); load();
+    }
+    async function loadMe() {
+      const res = await fetch('/api/me'); if (!res.ok) return; const me = await res.json();
+      if (me.auth !== 'proxy') { document.getElementById('soloAdmin').hidden = !me.admin; return; }
+      const who = document.getElementById('who'); who.textContent = me.user; who.hidden = false; if (me.admin) who.href = '/admin';
+      if (me.logout_url) { const link = document.getElementById('logoutLink'); link.href = me.logout_url; link.hidden = false; }
+    }
+    loadMe(); load();
+  </script>
+  <script src="/static/theme.js"></script>
+</body>
+</html>

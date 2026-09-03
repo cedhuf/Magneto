@@ -16,6 +16,7 @@ https://github.com/user-attachments/assets/419d3e50-c933-444b-8cab-a9724986ba05
 - Quality/resolution picker
 - Bulk downloads — paste multiple URLs at once
 - Automatic URL deduplication
+- A personal YouTube feed — follow channels and browse their five latest videos
 - Clean, responsive UI — no frameworks, no build step
 - Single Python file backend (~150 lines)
 
@@ -43,6 +44,13 @@ docker build -t reclip . && docker run -p 8899:8899 reclip
 3. Click **Fetch** to load video info and thumbnails
 4. Select quality/resolution if available
 5. Click **Download** on individual videos, or **Download All**
+
+### Feed
+
+Open **Feed** to follow YouTube channels. ReClip stores each channel's five
+latest videos and merges them into a compact, newest-first grid. Use **Refresh
+feed** when you want to update the cached list; opening a video returns to the
+normal downloader, including its format and quality picker.
 
 ## Retention
 
