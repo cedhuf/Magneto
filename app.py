@@ -395,7 +395,11 @@ def fetch_channel(url):
             videos.append({
                 "url": video_url,
                 "title": entry.get("title") or "Untitled",
-                "thumbnail": entry.get("thumbnail") or "",
+                # Flat channel entries often omit the thumbnail even though
+                # YouTube exposes a stable image for every video id.
+                "thumbnail": entry.get("thumbnail") or (
+                    f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg" if video_id else ""
+                ),
                 "upload_date": entry.get("upload_date") or "",
                 "duration": entry.get("duration"),
             })
