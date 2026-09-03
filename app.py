@@ -422,9 +422,31 @@ def delete_entry(job_id):
     return jsonify({"ok": True})
 
 
+def remember(owner, url, title, thumbnail):
+    """Record a fetched URL, so it survives the tab without being downloaded.
+
+    Fetching the same URL twice returns the same row rather than a second card,
+    which also means a URL already downloaded comes back with its state.
+    """
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT job_id FROM entries WHERE owner = ? AND url = ?"
+            " ORDER BY created_at DESC LIMIT 1", (owner, url)).fetchone()
+        if row:
+            conn.execute("UPDATE entries SET title = ?, thumbnail = ? WHERE job_id = ?",
+                         (title, thumbnail, row["job_id"]))
+            return row["job_id"]
+        job_id = uuid.uuid4().hex[:10]
+        conn.execute(
+            "INSERT INTO entries (job_id, owner, url, title, thumbnail, status,"
+            " created_at) VALUES (?, ?, ?, ?, ?, 'ready', ?)",
+            (job_id, owner, url, title, thumbnail, time.time()))
+        return job_id
+
+
 @app.route("/api/info", methods=["POST"])
 def get_info():
-    current_user()
+    owner = current_user()
     data = request.json
     url = data.get("url", "").strip()
     if not url:
@@ -458,9 +480,12 @@ def get_info():
             })
         formats.sort(key=lambda x: x["height"], reverse=True)
 
+        title = info.get("title", "")
+        thumbnail = info.get("thumbnail", "")
         return jsonify({
-            "title": info.get("title", ""),
-            "thumbnail": info.get("thumbnail", ""),
+            "job_id": remember(owner, url, title, thumbnail),
+            "title": title,
+            "thumbnail": thumbnail,
             "duration": info.get("duration"),
             "uploader": info.get("uploader", ""),
             "formats": formats,
