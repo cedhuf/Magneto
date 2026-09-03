@@ -128,8 +128,9 @@ body::after {
   margin-left: 2px;
   border-left: 1px solid var(--card-border);
   /* Room for the longest of Auto, Light and Dark, so cycling does not shift
-     the row. The font is monospace, hence ch. */
-  min-width: calc(5ch + 14px);
+     the row. Monospace, hence ch, plus a margin for the letter-spacing that
+     ch does not account for. */
+  min-width: calc(6ch + 14px);
   text-align: right;
 }
 .brand h1 {
