@@ -3,6 +3,7 @@ import time
 import uuid
 import glob
 import json
+import shutil
 import sqlite3
 import subprocess
 import threading
@@ -25,6 +26,9 @@ SWEEP_INTERVAL = 60
 # account on a shared instance the day the proxy is misconfigured.
 AUTH_MODE = os.environ.get("RECLIP_AUTH", "none")
 ADMIN_GROUP = os.environ.get("RECLIP_ADMIN_GROUP", "admin")
+# The session belongs to the proxy, so signing out is a link to it, not
+# something this app can do. Empty means no button.
+LOGOUT_URL = os.environ.get("RECLIP_LOGOUT_URL", "")
 SOLO_USER = "local"
 
 
@@ -83,6 +87,19 @@ def is_admin():
         return True
     groups = (request.headers.get("Remote-Groups") or "").split(",")
     return ADMIN_GROUP in [g.strip() for g in groups]
+
+
+def require_admin():
+    current_user()
+    if not is_admin():
+        abort(403)
+
+
+def file_size(path):
+    try:
+        return os.path.getsize(path)
+    except (OSError, TypeError):
+        return 0
 
 
 def get_entry(job_id, owner=None):
@@ -252,6 +269,77 @@ def run_download(job_id, url, format_choice, format_id, title):
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/api/me")
+def whoami():
+    return jsonify({
+        "user": current_user(),
+        "admin": is_admin(),
+        "auth": AUTH_MODE,
+        "logout_url": LOGOUT_URL,
+    })
+
+
+@app.route("/admin")
+def admin_page():
+    require_admin()
+    return render_template("admin.html")
+
+
+@app.route("/api/admin/overview")
+def admin_overview():
+    require_admin()
+
+    on_disk = [p for p in glob.glob(os.path.join(DOWNLOAD_DIR, "*"))]
+    with connect() as conn:
+        rows = conn.execute("SELECT * FROM entries ORDER BY created_at DESC").fetchall()
+
+    users = {}
+    entries = []
+    for row in rows:
+        size = file_size(row["path"]) if row["path"] else 0
+        stats = users.setdefault(row["owner"], {"entries": 0, "files": 0, "bytes": 0})
+        stats["entries"] += 1
+        if size:
+            stats["files"] += 1
+            stats["bytes"] += size
+        entries.append({**entry_json(row), "owner": row["owner"],
+                        "created_at": row["created_at"], "bytes": size})
+
+    return jsonify({
+        "retention": RETENTION,
+        "auth": AUTH_MODE,
+        # Counted from the directory rather than from the rows, so a file no row
+        # claims still shows up in the total.
+        "disk": {
+            "files": len(on_disk),
+            "bytes": sum(file_size(p) for p in on_disk),
+            "free": shutil.disk_usage(DOWNLOAD_DIR).free,
+        },
+        "users": users,
+        "entries": entries,
+    })
+
+
+@app.route("/api/admin/sweep", methods=["POST"])
+def admin_sweep():
+    require_admin()
+    sweep_downloads()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/entries/<job_id>", methods=["DELETE"])
+def admin_delete_entry(job_id):
+    require_admin()
+    row = get_entry(job_id)
+    if row is None:
+        return jsonify({"error": "Not found"}), 404
+    if row["path"]:
+        remove_quietly(row["path"])
+    with connect() as conn:
+        conn.execute("DELETE FROM entries WHERE job_id = ?", (job_id,))
+    return jsonify({"ok": True})
 
 
 @app.route("/api/entries")

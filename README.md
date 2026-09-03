@@ -81,11 +81,22 @@ date rather than stored.
 | --- | --- | --- |
 | `RECLIP_AUTH` | `none` | `none` for one implicit user, `proxy` to read the identity from a forward-auth proxy. In `proxy` a missing `Remote-User` is a 401, never a fallback |
 | `RECLIP_ADMIN_GROUP` | `admin` | Group name granting admin, matched against `Remote-Groups`. Ignored when `RECLIP_AUTH=none`, where the only user is admin |
+| `RECLIP_LOGOUT_URL` | empty | Where the "Sign out" link points. The session belongs to the proxy, so this is its logout URL; empty hides the link |
 | `RECLIP_RETENTION` | `86400` | Seconds a downloaded file is kept, counted from the file's date. Its entry stays afterwards |
 | `RECLIP_DB` | `data/reclip.db` | SQLite file. Put it on the same volume as the downloads, not inside the downloads directory |
 | `RECLIP_BIND` | `0.0.0.0:8899` | What gunicorn listens on. In proxy mode, `127.0.0.1:8899` when the proxy is on the same host; otherwise the reachable address, with the port firewalled to the proxy |
 | `RECLIP_NO_UPDATE` | unset | Set to any value to skip the yt-dlp update at container start. There is no good reason to: extractors break every few weeks and the update is the fix |
 | `HOST` / `PORT` | `127.0.0.1` / `8899` | Only used by `python app.py` and `reclip.sh`. The image goes through gunicorn and reads `RECLIP_BIND` |
+
+### Admin
+
+`/admin` shows what the instance holds: space taken, space left, entries and
+size per user, and every entry with its age and remaining time. It can run the
+sweep early and delete a file with its entry. Nothing is configured there,
+settings are environment variables.
+
+Admin is membership of `RECLIP_ADMIN_GROUP` in `Remote-Groups`. With
+`RECLIP_AUTH=none` the single user is admin, since there is nobody else.
 
 ### Behind a forward-auth proxy
 

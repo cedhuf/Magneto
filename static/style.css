@@ -234,6 +234,89 @@ textarea::placeholder { color: var(--muted); }
 /* Cards */
 .cards { margin-top: 24px; }
 
+/* Admin */
+.page-wide { max-width: 1000px; }
+.brand-actions { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+.text-btn {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-decoration: none;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.text-btn:hover { color: var(--accent); }
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+.stat {
+  border: 1.5px solid var(--card-border);
+  border-radius: var(--radius);
+  background: var(--card);
+  padding: 16px 18px;
+}
+.stat-value {
+  font-family: 'Instrument Serif', serif;
+  font-size: 1.7rem;
+  line-height: 1.1;
+  color: var(--fg);
+}
+.stat-label {
+  margin-top: 4px;
+  font-size: 0.66rem;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.stat-hint { margin-top: 2px; font-size: 0.64rem; color: var(--muted); opacity: 0.7; }
+.admin-controls { margin-top: 20px; }
+.admin-controls .fetch-btn { flex: 0 0 auto; }
+
+/* Wide tables scroll on their own rather than pushing the page sideways. */
+.table-scroll { overflow-x: auto; }
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+}
+.admin-table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.62rem;
+  padding: 8px 10px;
+}
+.admin-table td {
+  padding: 9px 10px;
+  border-top: 1px solid var(--card-border);
+  white-space: nowrap;
+}
+.admin-table .num { text-align: right; }
+.admin-table .col-owner { color: var(--accent); }
+.admin-table .col-title {
+  max-width: 380px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row-btn {
+  border: 1.5px solid var(--card-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.64rem;
+  padding: 4px 9px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.row-btn:hover { color: var(--error); border-color: var(--error); }
+
 .history { margin-top: 40px; }
 .history-head {
   font-size: 0.68rem;

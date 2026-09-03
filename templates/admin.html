@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReClip admin</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="/static/style.css">
+  <script>
+    // Before first paint, or the page flashes light before the choice applies.
+    try {
+      var saved = localStorage.getItem('theme');
+      if (saved === 'dark' || saved === 'light') {
+        document.documentElement.dataset.theme = saved;
+      }
+    } catch (e) {}
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="page page-wide">
+    <div class="brand">
+      <div class="brand-text">
+        <h1>Re<em>Clip</em></h1>
+        <p>Administration</p>
+      </div>
+      <div class="brand-actions">
+        <a class="text-btn" href="/">Back to app</a>
+        <button class="theme-btn" id="theme-btn" onclick="cycleTheme()" type="button"></button>
+      </div>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="controls admin-controls">
+      <button class="fetch-btn" id="sweepBtn" onclick="sweepNow()">Run the sweep now</button>
+      <span class="card-status" id="sweepMsg"></span>
+    </div>
+
+    <div class="history">
+      <div class="history-head">Everything on this instance</div>
+      <div class="table-scroll">
+        <table class="admin-table" id="table"></table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function bytes(n) {
+      if (!n) return '0';
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.min(Math.floor(Math.log(n) / Math.log(1024)), units.length - 1);
+      return `${(n / 1024 ** i).toFixed(i ? 1 : 0)} ${units[i]}`;
+    }
+
+    function duration(s) {
+      if (s <= 0) return 'gone';
+      const h = Math.floor(s / 3600);
+      if (h >= 48) return `${Math.floor(h / 24)}d`;
+      return h ? `${h}h` : `${Math.floor(s / 60)}m`;
+    }
+
+    function ago(ts) {
+      return duration(Math.floor(Date.now() / 1000 - ts)).replace('gone', 'now');
+    }
+
+    function tile(label, value, hint) {
+      return `<div class="stat">
+        <div class="stat-value">${esc(value)}</div>
+        <div class="stat-label">${esc(label)}</div>
+        ${hint ? `<div class="stat-hint">${esc(hint)}</div>` : ''}
+      </div>`;
+    }
+
+    async function load() {
+      const res = await fetch('/api/admin/overview');
+      if (!res.ok) {
+        document.getElementById('stats').innerHTML =
+          '<div class="stat"><div class="stat-value">403</div><div class="stat-label">Not an admin</div></div>';
+        return;
+      }
+      const d = await res.json();
+
+      const users = Object.entries(d.users);
+      document.getElementById('stats').innerHTML = [
+        tile('Taken by downloads', bytes(d.disk.bytes), `${d.disk.files} file(s) on disk`),
+        tile('Free on this disk', bytes(d.disk.free)),
+        tile('Entries', String(d.entries.length), `${users.length} user(s)`),
+        tile('Retention', duration(d.retention), d.auth === 'proxy' ? 'proxy auth' : 'single user'),
+      ].join('');
+
+      const rows = d.entries.map(e => `
+        <tr>
+          <td class="col-owner">${esc(e.owner)}</td>
+          <td class="col-title" title="${esc(e.title || e.url)}">${esc(e.title || e.url)}</td>
+          <td>${esc(e.status)}</td>
+          <td class="num">${e.bytes ? esc(bytes(e.bytes)) : '—'}</td>
+          <td class="num">${esc(ago(e.created_at))}</td>
+          <td class="num">${e.has_file ? esc(duration(e.expires_in)) : '—'}</td>
+          <td><button class="row-btn" onclick="removeEntry('${e.job_id}')">Delete</button></td>
+        </tr>`).join('');
+
+      document.getElementById('table').innerHTML = `
+        <thead><tr>
+          <th>User</th><th>Title</th><th>Status</th>
+          <th class="num">Size</th><th class="num">Age</th><th class="num">Left</th><th></th>
+        </tr></thead>
+        <tbody>${rows || '<tr><td colspan="7">Nothing yet.</td></tr>'}</tbody>`;
+    }
+
+    async function sweepNow() {
+      const btn = document.getElementById('sweepBtn');
+      const msg = document.getElementById('sweepMsg');
+      btn.disabled = true;
+      await fetch('/api/admin/sweep', { method: 'POST' });
+      await load();
+      btn.disabled = false;
+      msg.textContent = 'Swept.';
+      setTimeout(() => { msg.textContent = ''; }, 3000);
+    }
+
+    async function removeEntry(jobId) {
+      // Deletes the file and the entry, so the owner loses it from their
+      // history too. Maintenance, not tidying.
+      if (!confirm('Delete this file and its entry?')) return;
+      await fetch(`/api/admin/entries/${jobId}`, { method: 'DELETE' });
+      load();
+    }
+
+    load();
+  </script>
+  <script src="/static/theme.js"></script>
+</body>
+</html>
