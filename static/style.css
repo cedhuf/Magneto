@@ -23,6 +23,13 @@
   --shimmer-base: #ebe8e2;
   --shimmer-highlight: #f0ede7;
   --noise-opacity: 0.03;
+  /* Same in both themes: a scrim over an image, and a video letterbox. */
+  --scrim: rgba(0, 0, 0, 0.32);
+  --scrim-soft: rgba(0, 0, 0, 0.22);
+  --scrim-strong: rgba(0, 0, 0, 0.72);
+  --on-scrim: #fff;
+  --scrim-shadow: rgba(0, 0, 0, 0.5);
+  --video-bg: #000;
   --radius: 14px;
   --shimmer: linear-gradient(90deg, var(--shimmer-base) 25%, var(--shimmer-highlight) 50%, var(--shimmer-base) 75%);
 }
@@ -271,6 +278,102 @@ textarea::placeholder { color: var(--muted); }
   width: 28px;
   height: 28px;
   opacity: 0.5;
+}
+
+/* Play badge on the thumbnail */
+.thumb-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: var(--scrim);
+  color: var(--on-scrim);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.card-thumb:hover .thumb-play,
+.thumb-play:focus-visible { opacity: 1; }
+.thumb-play svg {
+  width: 26px;
+  height: 26px;
+  filter: drop-shadow(0 1px 3px var(--scrim-shadow));
+}
+/* No hover on touch, so the badge has to stay visible there. */
+@media (hover: none) {
+  .thumb-play { opacity: 1; background: var(--scrim-soft); }
+}
+
+/* Player overlay */
+.player-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--scrim-strong);
+  animation: fadeIn 0.2s ease-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.player-box {
+  width: 100%;
+  max-width: 880px;
+  border: 1.5px solid var(--card-border);
+  border-radius: var(--radius);
+  background: var(--card);
+  overflow: hidden;
+}
+.player-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 16px;
+}
+.player-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.player-close {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+.player-close:hover { color: var(--fg); background: var(--fg-wash); }
+.player-close svg { width: 16px; height: 16px; }
+.player-media {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+  background: var(--video-bg);
+}
+audio.player-media {
+  max-height: none;
+  background: transparent;
+  padding: 0 16px 16px;
+  width: calc(100% - 32px);
 }
 
 /* Shimmer skeleton for loading state */

@@ -269,6 +269,20 @@ def check_status(job_id):
     })
 
 
+@app.route("/api/stream/<job_id>")
+def stream_file(job_id):
+    job = jobs.get(job_id)
+    if not job or job["status"] != "done":
+        return jsonify({"error": "File not ready"}), 404
+    # Inline rather than an attachment, and conditional so the browser can seek
+    # with Range requests instead of pulling the whole file first.
+    response = send_file(job["file"], conditional=True)
+    # A player issues a request per seek and per buffer refill, so watching
+    # keeps pushing the deadline back rather than starting a countdown.
+    job["expires_at"] = time.time() + GRACE_AFTER_FETCH
+    return response
+
+
 @app.route("/api/file/<job_id>")
 def download_file(job_id):
     job = jobs.get(job_id)

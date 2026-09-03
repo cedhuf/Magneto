@@ -234,8 +234,14 @@
           <span class="card-status error">${esc(friendlyError(c.error || 'Download failed'))}</span>`;
       }
 
+      const playHtml = (c.status === 'ready' || c.status === 'done')
+        ? `<button class="thumb-play" onclick="playCard(${idx})" aria-label="Play" title="Play">
+             <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 21 12 6 21 6 3"/></svg>
+           </button>`
+        : '';
+
       el.innerHTML = `
-        <div class="card-thumb">${thumbHtml}</div>
+        <div class="card-thumb">${thumbHtml}${playHtml}</div>
         <div class="card-body">
           <div class="card-title">${esc(c.title || 'Untitled')}</div>
           <div class="card-meta">${esc(c.uploader)}${c.duration ? ' · ' + fmtDur(c.duration) : ''}</div>
@@ -304,7 +310,14 @@
             c.status = 'done';
             c.filename = data.filename;
             renderCard(idx);
-            saveCard(idx);
+            // Asking to play should not also drop the file in the user's
+            // Downloads folder; the Save button stays available for that.
+            if (c.playWhenDone) {
+              c.playWhenDone = false;
+              openPlayer(idx);
+            } else {
+              saveCard(idx);
+            }
           } else if (data.status === 'error') {
             clearInterval(iv);
             c.status = 'error';
@@ -340,6 +353,58 @@
       }
 
       if (btn) { btn.disabled = false; btn.textContent = 'Download All'; }
+    }
+
+    /* Playback: the server file only. A card that has not been downloaded yet
+       starts the download and plays when it lands. */
+    function playCard(idx) {
+      const c = cardData[idx];
+      if (c.status === 'done') {
+        openPlayer(idx);
+      } else if (c.status !== 'downloading') {
+        c.playWhenDone = true;
+        dlCard(idx);
+      }
+    }
+
+    function openPlayer(idx) {
+      const c = cardData[idx];
+      const tag = (c.filename || '').toLowerCase().endsWith('.mp3') ? 'audio' : 'video';
+
+      const overlay = document.createElement('div');
+      overlay.className = 'player-overlay';
+      overlay.innerHTML = `
+        <div class="player-box">
+          <div class="player-head">
+            <span class="player-title">${esc(c.title || c.filename || '')}</span>
+            <button class="player-close" aria-label="Close" title="Close">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <${tag} class="player-media" src="/api/stream/${c.jobId}" controls autoplay playsinline></${tag}>
+        </div>
+      `;
+
+      function close() {
+        const media = overlay.querySelector('.player-media');
+        // Clearing the source stops the transfer; removing the node alone
+        // leaves the browser fetching in some engines.
+        media.pause();
+        media.removeAttribute('src');
+        media.load();
+        overlay.remove();
+        document.removeEventListener('keydown', onKey);
+      }
+      function onKey(e) {
+        if (e.key === 'Escape') close();
+      }
+
+      overlay.addEventListener('click', e => {
+        if (e.target === overlay) close();
+      });
+      overlay.querySelector('.player-close').addEventListener('click', close);
+      document.addEventListener('keydown', onKey);
+      document.body.appendChild(overlay);
     }
 
     /* Theme: system, light, dark. "system" stores nothing and lets the
