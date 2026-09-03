@@ -7,7 +7,7 @@ import shutil
 import sqlite3
 import subprocess
 import threading
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 from flask import Flask, request, jsonify, send_file, render_template, abort
 
 app = Flask(__name__)
@@ -348,18 +348,36 @@ def run_download(job_id, url, format_choice, format_id, title):
         update_entry(job_id, status="error", error=str(e))
 
 
-def is_youtube_channel_url(url):
-    """A feed accepts channel pages only, not arbitrary yt-dlp URLs."""
-    try:
-        host = urlparse(url).hostname or ""
-    except ValueError:
-        return False
-    return host == "youtube.com" or host.endswith(".youtube.com")
+def youtube_videos_url(url):
+    """Turn any supported channel URL into its Videos tab.
+
+    A channel home page is itself a playlist of tabs (Videos, Shorts, Live),
+    which is what yt-dlp returns when asked for it directly. The Videos tab is
+    the chronological feed we want instead.
+    """
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+    parts = [part for part in parsed.path.split("/") if part]
+    if not (host == "youtube.com" or host.endswith(".youtube.com")):
+        return None
+    if not parts or (parts[0] != "@" and not parts[0].startswith("@") and
+                     parts[0] not in ("channel", "c", "user")):
+        return None
+    if parts[-1] in ("videos", "shorts", "streams", "live", "featured",
+                     "playlists", "community"):
+        parts.pop()
+    if not parts:
+        return None
+    return urlunparse(parsed._replace(path="/" + "/".join(parts + ["videos"]),
+                                      query="", fragment=""))
 
 
 def fetch_channel(url):
-    """Return the five newest entries without resolving each video separately."""
-    cmd = ["yt-dlp", "--flat-playlist", "--playlist-end", "5", "-J", "--", url]
+    """Return the five newest videos without resolving each one separately."""
+    videos_url = youtube_videos_url(url)
+    if not videos_url:
+        raise ValueError("Please enter a YouTube channel URL")
+    cmd = ["yt-dlp", "--flat-playlist", "--playlist-end", "5", "-J", "--", videos_url]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
     if result.returncode != 0:
         raise ValueError(result.stderr.strip().split("\n")[-1])
@@ -383,7 +401,9 @@ def fetch_channel(url):
             })
     return {
         "channel_id": str(channel_id),
-        "channel_url": info.get("webpage_url") or url,
+        # Keep the Videos tab for later refreshes; the channel home page would
+        # send yt-dlp back to its list of category tabs.
+        "channel_url": videos_url,
         "title": info.get("channel") or info.get("uploader") or info.get("title") or url,
         "thumbnail": info.get("channel_thumbnail") or info.get("thumbnail") or "",
         "videos": videos,
@@ -450,7 +470,7 @@ def feed():
 def subscribe():
     owner = current_user()
     url = (request.json or {}).get("url", "").strip()
-    if not is_safe_url(url) or not is_youtube_channel_url(url):
+    if not is_safe_url(url) or not youtube_videos_url(url):
         return jsonify({"error": "Please enter a YouTube channel URL"}), 400
     try:
         return jsonify(refresh_subscription(owner, url))
