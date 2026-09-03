@@ -323,7 +323,8 @@ textarea::placeholder { color: var(--muted); }
 
 .card {
   display: flex;
-  gap: 14px;
+  align-items: center;
+  gap: 16px;
   border: 1.5px solid var(--card-border);
   border-radius: var(--radius);
   background: var(--card);
@@ -490,6 +491,35 @@ audio.player-media {
   display: flex;
   flex-direction: column;
   justify-content: center;
+}
+
+/* The action column has a width of its own, so nothing in the text can push
+   the buttons around, and the buttons line up down the list. */
+.card-side {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.card-icons { display: flex; gap: 2px; }
+.card-note-row { margin-top: 6px; }
+.card-note { font-size: 0.68rem; color: var(--muted); }
+.card-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+/* Remaining time sits on the thumbnail, out of the text flow entirely. */
+.thumb-ttl {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--scrim-strong);
+  color: var(--on-scrim);
+  font-size: 0.56rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 .card-title {
   font-family: 'Instrument Serif', serif;
@@ -661,8 +691,8 @@ audio.player-media {
 
 /* Per-entry actions */
 .icon-btn {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
