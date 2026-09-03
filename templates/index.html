@@ -72,6 +72,15 @@
       return [...new Set(text.split(/[\s,]+/).map(u => u.trim()).filter(u => u.startsWith('http')))];
     }
 
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    function fmtDate(d) {
+      // yt-dlp gives YYYYMMDD as a string.
+      if (!d || d.length !== 8) return '';
+      return `${+d.slice(6)} ${MONTHS[+d.slice(4, 6) - 1]} ${d.slice(0, 4)}`;
+    }
+
     function fmtDur(s) {
       if (!s) return '';
       const m = Math.floor(s / 60);
@@ -284,6 +293,14 @@
            </button>`
         : '';
 
+      const meta = [c.uploader, c.duration ? fmtDur(c.duration) : '',
+                    fmtDate(c.upload_date)].filter(Boolean).map(esc);
+      // Links and sponsor blocks make modern descriptions unreadable inline, so
+      // it stays folded and is shown as plain text, never as live links.
+      const descToggle = c.description
+        ? `<button class="link-btn" onclick="toggleDesc(${idx})">Description</button>`
+        : '';
+
       // On the thumbnail, so a long countdown cannot move any text.
       const ttlHtml = c.status === 'done'
         ? `<span class="thumb-ttl" id="ttl-${idx}">${ttlLabel(c)}</span>`
@@ -293,7 +310,8 @@
         <div class="card-thumb">${thumbHtml}${playHtml}${ttlHtml}</div>
         <div class="card-body">
           <div class="card-title">${esc(c.title || 'Untitled')}</div>
-          <div class="card-meta">${esc(c.uploader)}${c.duration ? ' · ' + fmtDur(c.duration) : ''}</div>
+          <div class="card-meta">${meta.join(' · ')}${descToggle}</div>
+          ${c.description ? `<div class="card-desc" id="desc-${idx}" hidden>${esc(c.description)}</div>` : ''}
           ${note ? `<div class="card-note-row">${note}</div>` : ''}
           ${qualityChips ? `<div class="card-chips">${qualityChips}</div>` : ''}
         </div>
@@ -467,6 +485,15 @@
         !document.getElementById('history').children.length;
     }
 
+    function toggleDesc(idx) {
+      const panel = document.getElementById(`desc-${idx}`);
+      const card = document.getElementById(`card-${idx}`);
+      panel.hidden = !panel.hidden;
+      // The row keeps its height at rest; only an explicit click grows it, and
+      // the thumbnail must stop stretching when it does.
+      card.classList.toggle('expanded', !panel.hidden);
+    }
+
     function ttlLabel(c) {
       if (!c.deleteAt) return '';
       const left = c.deleteAt - Date.now();
@@ -497,6 +524,8 @@
           thumbnail: e.thumbnail || '',
           uploader: e.uploader || '',
           duration: e.duration,
+          description: e.description || '',
+          upload_date: e.upload_date || '',
           formats: e.formats || [],
           selectedFormatId: e.format_id || e.formats?.[0]?.id || null,
           jobId: e.job_id,

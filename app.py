@@ -73,6 +73,10 @@ MIGRATIONS = [
     ALTER TABLE entries ADD COLUMN uploader TEXT;
     ALTER TABLE entries ADD COLUMN duration REAL;
     """,
+    """
+    ALTER TABLE entries ADD COLUMN description TEXT;
+    ALTER TABLE entries ADD COLUMN upload_date TEXT;
+    """,
 ]
 
 
@@ -167,6 +171,8 @@ def entry_json(row):
         "thumbnail": row["thumbnail"],
         "uploader": row["uploader"],
         "duration": row["duration"],
+        "description": row["description"],
+        "upload_date": row["upload_date"],
         "format": row["format"],
         "format_id": row["format_id"],
         "formats": json.loads(row["formats"]) if row["formats"] else [],
@@ -441,21 +447,23 @@ def remember(owner, url, info):
     what a restored card will not be able to show.
     """
     values = (info["title"], info["thumbnail"], json.dumps(info["formats"]),
-              info["uploader"], info["duration"])
+              info["uploader"], info["duration"], info["description"],
+              info["upload_date"])
     with connect() as conn:
         row = conn.execute(
             "SELECT job_id FROM entries WHERE owner = ? AND url = ?"
             " ORDER BY created_at DESC LIMIT 1", (owner, url)).fetchone()
         if row:
             conn.execute("UPDATE entries SET title = ?, thumbnail = ?, formats = ?,"
-                         " uploader = ?, duration = ? WHERE job_id = ?",
+                         " uploader = ?, duration = ?, description = ?,"
+                         " upload_date = ? WHERE job_id = ?",
                          (*values, row["job_id"]))
             return row["job_id"]
         job_id = uuid.uuid4().hex[:10]
         conn.execute(
             "INSERT INTO entries (job_id, owner, url, title, thumbnail, formats,"
-            " uploader, duration, status, created_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ready', ?)",
+            " uploader, duration, description, upload_date, status, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ready', ?)",
             (job_id, owner, url, *values, time.time()))
         return job_id
 
@@ -477,6 +485,11 @@ def get_info():
             return jsonify({"error": result.stderr.strip().split("\n")[-1]}), 400
 
         info = parse_ytdlp_json(result.stdout)
+
+        # A live stream has no end, so the download would run into the 300s
+        # timeout and fail with something unreadable. Refuse it now instead.
+        if info.get("live_status") in ("is_live", "is_upcoming"):
+            return jsonify({"error": "This is a live stream, not a finished video"}), 400
 
         # Build quality options, keeping the best format per resolution
         best_by_height = {}
@@ -501,6 +514,8 @@ def get_info():
             "thumbnail": info.get("thumbnail", ""),
             "duration": info.get("duration"),
             "uploader": info.get("uploader", ""),
+            "description": info.get("description", ""),
+            "upload_date": info.get("upload_date", ""),
             "formats": formats,
         }
         return jsonify({"job_id": remember(owner, url, card), **card})
