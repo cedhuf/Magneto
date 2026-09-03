@@ -233,6 +233,9 @@
       } else if (c.status === 'error') {
         actionHtml = `<button class="card-dl-btn" onclick="dlCard(${idx})">Retry</button>
           <span class="card-status error">${esc(friendlyError(c.error || 'Download failed'))}</span>`;
+      } else if (c.status === 'gone') {
+        actionHtml = `<button class="card-dl-btn" onclick="dlCard(${idx})">Download again</button>
+          <span class="card-ttl">no longer on server</span>`;
       }
 
       const playHtml = (c.status === 'ready' || c.status === 'done')
@@ -282,6 +285,10 @@
             format: currentFormat,
             format_id: c.selectedFormatId,
             title: c.title || '',
+            thumbnail: c.thumbnail || '',
+            // Set when restarting a history entry, so its row is reused
+            // instead of the list growing a duplicate.
+            job_id: c.jobId || null,
           }),
         });
         const data = await res.json();
@@ -342,7 +349,6 @@
       a.href = `/api/file/${c.jobId}`;
       a.download = c.filename || '';
       a.click();
-      setTimeout(() => refreshTtl(idx), 1500);
     }
 
     async function dlAll() {
@@ -370,20 +376,39 @@
       return h ? `on server ${h}h ${m}m` : `on server ${m || 1}m`;
     }
 
-    // Fetching restarts the 24h clock, so the label has to be re-read after a
-    // save or a play; otherwise the card keeps showing the untouched-file week.
-    async function refreshTtl(idx) {
-      const c = cardData[idx];
-      if (!c.jobId) return;
+    /* The server keeps the list, so a reload, a closed laptop or a long
+       playlist all survive: entries come back, downloads in flight resume
+       being polled, and an entry whose file has been swept offers to start
+       again. */
+    async function restoreEntries() {
+      let data;
       try {
-        const res = await fetch(`/api/status/${c.jobId}`);
-        const data = await res.json();
-        if (!data.expires_in) return;
-        c.deleteAt = Date.now() + data.expires_in * 1000;
-        const el = document.getElementById(`ttl-${idx}`);
-        if (el) el.textContent = ttlLabel(c);
-      } catch (e) {}
+        const res = await fetch('/api/entries');
+        if (!res.ok) return;
+        data = await res.json();
+      } catch (e) {
+        return;
+      }
+      for (const e of data.entries) {
+        const c = {
+          url: e.url,
+          title: e.title || '',
+          thumbnail: e.thumbnail || '',
+          formats: [],
+          selectedFormatId: e.format_id || null,
+          jobId: e.job_id,
+          filename: e.filename,
+          error: e.error,
+          status: e.status === 'done' && !e.has_file ? 'gone' : e.status,
+          deleteAt: e.expires_in ? Date.now() + e.expires_in * 1000 : null,
+        };
+        const idx = cardData.push(c) - 1;
+        renderCard(idx);
+        if (c.status === 'downloading') pollCard(idx);
+      }
     }
+
+    restoreEntries();
 
     setInterval(() => {
       cardData.forEach((c, idx) => {
@@ -442,7 +467,6 @@
       overlay.querySelector('.player-close').addEventListener('click', close);
       document.addEventListener('keydown', onKey);
       document.body.appendChild(overlay);
-      setTimeout(() => refreshTtl(idx), 1500);
     }
 
     /* Theme: system, light, dark. "system" stores nothing and lets the

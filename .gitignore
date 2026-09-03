@@ -1,5 +1,6 @@
 venv/
 downloads/
+data/
 __pycache__/
 *.pyc
 assets/*.mov

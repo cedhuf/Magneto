@@ -46,15 +46,32 @@ docker build -t reclip . && docker run -p 8899:8899 reclip
 
 ## Retention
 
-Downloads are temporary, and each card shows how long its file will still be
-there. A file is deleted a day after it was last fetched, played counting as
-fetched. One that nobody ever fetched goes after a week. Files left by a
-previous run are removed at startup, since their job ids died with the process.
+Files are temporary, the list is not. A file is deleted once it reaches
+`RECLIP_RETENTION`, and each card shows how long it has left. Its entry stays,
+so the download can be started again from the same card with one click. Both
+live in `/app/data` and `/app/downloads`, which is all a volume needs to cover.
+
+## Accounts
+
+With `RECLIP_AUTH=none`, the default, everything belongs to one implicit user
+and there is nothing to log into. That is the right mode for a personal
+instance.
+
+For a shared one, put a forward-auth proxy in front (tinyauth, Authelia, oauth2
+-proxy) and set `RECLIP_AUTH=proxy`. ReClip then reads `Remote-User` for the
+identity and `Remote-Groups` for the admin role. It implements no OIDC of its
+own: the proxy has already done that work.
+
+> **Bind to localhost in proxy mode.** The identity is a header, so anything
+> that can reach the port directly can claim to be anyone. `HOST=127.0.0.1`, and
+> let the proxy be the only way in.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `RECLIP_GRACE_AFTER_FETCH` | `86400` | Seconds kept after a fetch, restarted by each one |
-| `RECLIP_MAX_FILE_AGE` | `604800` | Backstop for a file nobody fetched |
+| `RECLIP_RETENTION` | `86400` | Seconds a downloaded file is kept |
+| `RECLIP_AUTH` | `none` | `none` or `proxy` |
+| `RECLIP_ADMIN_GROUP` | `admin` | Group granting admin, read from `Remote-Groups` |
+| `RECLIP_DB` | `data/reclip.db` | SQLite file |
 
 ## Supported Sites
 

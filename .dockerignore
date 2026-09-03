@@ -4,6 +4,7 @@
 _local
 assets
 downloads
+data
 __pycache__
 *.pyc
 *.pyo

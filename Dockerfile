@@ -17,7 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt gunicorn
 COPY . .
 
 RUN useradd -m -u 1000 reclip && \
-    mkdir -p /app/downloads && \
+    mkdir -p /app/downloads /app/data && \
     chown -R reclip:reclip /app
 USER reclip
 

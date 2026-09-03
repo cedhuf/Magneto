@@ -3,22 +3,128 @@ import time
 import uuid
 import glob
 import json
+import sqlite3
 import subprocess
 import threading
 from urllib.parse import urlparse
-from flask import Flask, request, jsonify, send_file, render_template
+from flask import Flask, request, jsonify, send_file, render_template, abort
 
 app = Flask(__name__)
 DOWNLOAD_DIR = os.path.join(os.path.dirname(__file__), "downloads")
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+os.makedirs(DATA_DIR, exist_ok=True)
 
-GRACE_AFTER_FETCH = int(os.environ.get("RECLIP_GRACE_AFTER_FETCH", 24 * 3600))
-# Only a backstop, for files nobody ever fetched. Its exact value matters
-# little; it exists so nothing sits there for a month.
-MAX_FILE_AGE = int(os.environ.get("RECLIP_MAX_FILE_AGE", 7 * 24 * 3600))
+DB_PATH = os.environ.get("RECLIP_DB", os.path.join(DATA_DIR, "reclip.db"))
+RETENTION = int(os.environ.get("RECLIP_RETENTION", 24 * 3600))
 SWEEP_INTERVAL = 60
 
-jobs = {}
+# "proxy" reads the identity a forward_auth proxy puts in front of us. Anything
+# else means a single implicit user. The switch is explicit on purpose: falling
+# back to that user when the header is merely missing would silently merge every
+# account on a shared instance the day the proxy is misconfigured.
+AUTH_MODE = os.environ.get("RECLIP_AUTH", "none")
+ADMIN_GROUP = os.environ.get("RECLIP_ADMIN_GROUP", "admin")
+SOLO_USER = "local"
+
+
+def connect():
+    conn = sqlite3.connect(DB_PATH, timeout=10)
+    conn.row_factory = sqlite3.Row
+    # WAL so the sweep thread and request threads do not block each other.
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
+    return conn
+
+
+MIGRATIONS = [
+    """
+    CREATE TABLE entries (
+        job_id     TEXT PRIMARY KEY,
+        owner      TEXT NOT NULL,
+        url        TEXT NOT NULL,
+        title      TEXT,
+        thumbnail  TEXT,
+        format     TEXT,
+        format_id  TEXT,
+        filename   TEXT,
+        path       TEXT,
+        status     TEXT NOT NULL,
+        error      TEXT,
+        created_at REAL NOT NULL
+    );
+    CREATE INDEX entries_owner ON entries (owner, created_at DESC);
+    """,
+]
+
+
+def migrate():
+    with connect() as conn:
+        version = conn.execute("PRAGMA user_version").fetchone()[0]
+        for i, script in enumerate(MIGRATIONS[version:], start=version):
+            conn.executescript(script)
+            conn.execute(f"PRAGMA user_version = {i + 1}")
+
+
+migrate()
+
+
+def current_user():
+    if AUTH_MODE != "proxy":
+        return SOLO_USER
+    user = (request.headers.get("Remote-User") or "").strip()
+    if not user:
+        abort(401)
+    return user
+
+
+def is_admin():
+    if AUTH_MODE != "proxy":
+        return True
+    groups = (request.headers.get("Remote-Groups") or "").split(",")
+    return ADMIN_GROUP in [g.strip() for g in groups]
+
+
+def get_entry(job_id, owner=None):
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM entries WHERE job_id = ?", (job_id,)).fetchone()
+    if row is None or (owner is not None and row["owner"] != owner):
+        return None
+    return row
+
+
+def update_entry(job_id, **fields):
+    assignments = ", ".join(f"{k} = ?" for k in fields)
+    with connect() as conn:
+        conn.execute(f"UPDATE entries SET {assignments} WHERE job_id = ?",
+                     (*fields.values(), job_id))
+
+
+def seconds_left(row):
+    """Seconds until the sweep takes this row's file."""
+    if not row["path"]:
+        return 0
+    try:
+        deadline = os.path.getmtime(row["path"]) + RETENTION
+    except OSError:
+        return 0
+    return max(0, int(deadline - time.time()))
+
+
+def entry_json(row):
+    return {
+        "job_id": row["job_id"],
+        "url": row["url"],
+        "title": row["title"],
+        "thumbnail": row["thumbnail"],
+        "format": row["format"],
+        "format_id": row["format_id"],
+        "filename": row["filename"],
+        "status": row["status"],
+        "error": row["error"],
+        "has_file": bool(row["path"]) and os.path.exists(row["path"]),
+        "expires_in": seconds_left(row),
+    }
 
 
 def is_safe_url(url):
@@ -59,18 +165,14 @@ def remove_quietly(path):
 
 
 def sweep_downloads():
-    """Drop fetched jobs past their grace period, then every file left over.
+    """Delete files past RETENTION, and files no row claims.
 
-    Job ids only exist in this process, so a file whose id is unknown belongs
-    to a previous run and is unreachable: at startup that is the whole
-    directory. This assumes the single gunicorn worker the Dockerfile declares.
+    The entry outlives its file: it keeps the title and the URL so the download
+    can be started again, which costs a row rather than gigabytes.
     """
     now = time.time()
-
-    for job_id, job in list(jobs.items()):
-        expires_at = job.get("expires_at")
-        if expires_at and now >= expires_at:
-            jobs.pop(job_id, None)
+    with connect() as conn:
+        known = {r["job_id"] for r in conn.execute("SELECT job_id FROM entries")}
 
     for path in glob.glob(os.path.join(DOWNLOAD_DIR, "*")):
         job_id = os.path.basename(path).split(".")[0]
@@ -78,22 +180,11 @@ def sweep_downloads():
             age = now - os.path.getmtime(path)
         except OSError:
             continue
-        if job_id in jobs and age < MAX_FILE_AGE:
+        if job_id in known and age < RETENTION:
             continue
         remove_quietly(path)
-        # Forget the job with its file, or the card keeps offering a dead link.
-        jobs.pop(job_id, None)
-
-
-def seconds_left(job):
-    """Seconds until the sweep takes this job's file, mirroring its two rules."""
-    try:
-        deadline = os.path.getmtime(job["file"]) + MAX_FILE_AGE
-    except (OSError, KeyError):
-        return 0
-    if job.get("expires_at"):
-        deadline = min(deadline, job["expires_at"])
-    return max(0, int(deadline - time.time()))
+        if job_id in known:
+            update_entry(job_id, path=None)
 
 
 def janitor():
@@ -108,8 +199,7 @@ def janitor():
 threading.Thread(target=janitor, daemon=True).start()
 
 
-def run_download(job_id, url, format_choice, format_id):
-    job = jobs[job_id]
+def run_download(job_id, url, format_choice, format_id, title):
     out_template = os.path.join(DOWNLOAD_DIR, f"{job_id}.%(ext)s")
 
     cmd = ["yt-dlp", "--no-playlist", "-o", out_template]
@@ -129,46 +219,34 @@ def run_download(job_id, url, format_choice, format_id):
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         if result.returncode != 0:
-            job["status"] = "error"
-            job["error"] = result.stderr.strip().split("\n")[-1]
+            update_entry(job_id, status="error", error=result.stderr.strip().split("\n")[-1])
             return
 
         files = glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}.*"))
         if not files:
-            job["status"] = "error"
-            job["error"] = "Download completed but no file was found"
+            update_entry(job_id, status="error",
+                         error="Download completed but no file was found")
             return
 
-        if format_choice == "audio":
-            target = [f for f in files if f.endswith(".mp3")]
-            chosen = target[0] if target else files[0]
-        else:
-            target = [f for f in files if f.endswith(".mp4")]
-            chosen = target[0] if target else files[0]
+        wanted = ".mp3" if format_choice == "audio" else ".mp4"
+        target = [f for f in files if f.endswith(wanted)]
+        chosen = target[0] if target else files[0]
 
         for f in files:
             if f != chosen:
-                try:
-                    os.remove(f)
-                except OSError:
-                    pass
+                remove_quietly(f)
 
-        job["status"] = "done"
-        job["file"] = chosen
         ext = os.path.splitext(chosen)[1]
-        title = job.get("title", "").strip()
+        title = (title or "").strip()
         # Sanitize title for filename
-        if title:
-            safe_title = "".join(c for c in title if c not in r'\/:*?"<>|').strip()[:100].strip()
-            job["filename"] = f"{safe_title}{ext}" if safe_title else os.path.basename(chosen)
-        else:
-            job["filename"] = os.path.basename(chosen)
+        safe_title = "".join(c for c in title if c not in r'\/:*?"<>|').strip()[:100].strip()
+        filename = f"{safe_title}{ext}" if safe_title else os.path.basename(chosen)
+
+        update_entry(job_id, status="done", path=chosen, filename=filename, error=None)
     except subprocess.TimeoutExpired:
-        job["status"] = "error"
-        job["error"] = "Download timed out (5 min limit)"
+        update_entry(job_id, status="error", error="Download timed out (5 min limit)")
     except Exception as e:
-        job["status"] = "error"
-        job["error"] = str(e)
+        update_entry(job_id, status="error", error=str(e))
 
 
 @app.route("/")
@@ -176,8 +254,19 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/api/entries")
+def list_entries():
+    owner = current_user()
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM entries WHERE owner = ? ORDER BY created_at", (owner,)
+        ).fetchall()
+    return jsonify({"entries": [entry_json(r) for r in rows], "user": owner})
+
+
 @app.route("/api/info", methods=["POST"])
 def get_info():
+    current_user()
     data = request.json
     url = data.get("url", "").strip()
     if not url:
@@ -193,7 +282,7 @@ def get_info():
 
         info = parse_ytdlp_json(result.stdout)
 
-        # Build quality options — keep best format per resolution
+        # Build quality options, keeping the best format per resolution
         best_by_height = {}
         for f in info.get("formats", []):
             height = f.get("height")
@@ -226,6 +315,7 @@ def get_info():
 
 @app.route("/api/playlist", methods=["POST"])
 def get_playlist_info():
+    current_user()
     data = request.json
     url = data.get("url", "").strip()
     if not url:
@@ -251,21 +341,37 @@ def get_playlist_info():
 
 @app.route("/api/download", methods=["POST"])
 def start_download():
+    owner = current_user()
     data = request.json
     url = data.get("url", "").strip()
     format_choice = data.get("format", "video")
     format_id = data.get("format_id")
     title = data.get("title", "")
+    retry_of = data.get("job_id")
 
     if not url:
         return jsonify({"error": "No URL provided"}), 400
     if not is_safe_url(url):
         return jsonify({"error": "Invalid URL"}), 400
 
-    job_id = uuid.uuid4().hex[:10]
-    jobs[job_id] = {"status": "downloading", "url": url, "title": title}
+    # Starting a history entry again reuses its row, so the list does not grow a
+    # duplicate every time a swept file is fetched anew.
+    existing = get_entry(retry_of, owner) if retry_of else None
+    if existing:
+        job_id = existing["job_id"]
+        update_entry(job_id, status="downloading", error=None, path=None,
+                     format=format_choice, format_id=format_id)
+    else:
+        job_id = uuid.uuid4().hex[:10]
+        with connect() as conn:
+            conn.execute(
+                "INSERT INTO entries (job_id, owner, url, title, thumbnail, format,"
+                " format_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (job_id, owner, url, title, data.get("thumbnail", ""), format_choice,
+                 format_id, "downloading", time.time()))
 
-    thread = threading.Thread(target=run_download, args=(job_id, url, format_choice, format_id))
+    thread = threading.Thread(target=run_download,
+                              args=(job_id, url, format_choice, format_id, title))
     thread.daemon = True
     thread.start()
 
@@ -274,41 +380,33 @@ def start_download():
 
 @app.route("/api/status/<job_id>")
 def check_status(job_id):
-    job = jobs.get(job_id)
-    if not job:
+    row = get_entry(job_id, current_user())
+    if row is None:
         return jsonify({"error": "Job not found"}), 404
     return jsonify({
-        "status": job["status"],
-        "error": job.get("error"),
-        "filename": job.get("filename"),
-        "expires_in": seconds_left(job) if job["status"] == "done" else None,
+        "status": row["status"],
+        "error": row["error"],
+        "filename": row["filename"],
+        "expires_in": seconds_left(row),
     })
 
 
 @app.route("/api/stream/<job_id>")
 def stream_file(job_id):
-    job = jobs.get(job_id)
-    if not job or job["status"] != "done":
+    row = get_entry(job_id, current_user())
+    if row is None or not row["path"] or not os.path.exists(row["path"]):
         return jsonify({"error": "File not ready"}), 404
     # Inline rather than an attachment, and conditional so the browser can seek
     # with Range requests instead of pulling the whole file first.
-    response = send_file(job["file"], conditional=True)
-    # A player issues a request per seek and per buffer refill, so watching
-    # keeps pushing the deadline back rather than starting a countdown.
-    job["expires_at"] = time.time() + GRACE_AFTER_FETCH
-    return response
+    return send_file(row["path"], conditional=True)
 
 
 @app.route("/api/file/<job_id>")
 def download_file(job_id):
-    job = jobs.get(job_id)
-    if not job or job["status"] != "done":
+    row = get_entry(job_id, current_user())
+    if row is None or not row["path"] or not os.path.exists(row["path"]):
         return jsonify({"error": "File not ready"}), 404
-    response = send_file(job["file"], as_attachment=True, download_name=job["filename"])
-    # The body is still being streamed when this returns, so the file can only
-    # go later; a second fetch within the grace period pushes the deadline back.
-    job["expires_at"] = time.time() + GRACE_AFTER_FETCH
-    return response
+    return send_file(row["path"], as_attachment=True, download_name=row["filename"])
 
 
 if __name__ == "__main__":
