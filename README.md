@@ -133,7 +133,9 @@ YouTube, TikTok, Instagram, Twitter/X, Reddit, Facebook, Vimeo, Twitch, Dailymot
 ## Stack
 
 - **Backend:** Python + Flask (~150 lines)
-- **Frontend:** Vanilla HTML/CSS/JS (single file, no build step)
+- **Frontend:** Vanilla HTML/CSS/JS, no build step
+- **Fonts:** Instrument Serif and DM Mono, self-hosted in `static/fonts` under
+  the SIL Open Font License. No page load reaches a third party
 - **Download engine:** [yt-dlp](https://github.com/yt-dlp/yt-dlp) + [ffmpeg](https://ffmpeg.org/)
 - **JavaScript runtime:** [deno](https://deno.com/) and the solver scripts, both
   from `yt-dlp[default,deno]`. YouTube's player challenge needs a real JS engine;
