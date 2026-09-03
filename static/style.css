@@ -621,6 +621,11 @@ audio.player-media {
   opacity: 0.75;
 }
 
+.q-size {
+  margin-left: 6px;
+  opacity: 0.6;
+}
+.q-more { color: var(--accent); }
 .q-chip {
   padding: 3px 9px;
   border: 1.5px solid var(--card-border);

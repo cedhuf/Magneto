@@ -81,6 +81,31 @@
       return `${+d.slice(6)} ${MONTHS[+d.slice(4, 6) - 1]} ${d.slice(0, 4)}`;
     }
 
+    function fmtSize(n) {
+      if (!n) return '';
+      return n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.round(n / 1e6)} MB`;
+    }
+
+    /* Three qualities by default, the best three at or below 1440p: 4K costs a
+       lot and shows little on the screens this ends up on. Everything else,
+       4K included, is one click away behind the +N chip. */
+    function splitFormats(formats, selectedId) {
+      const pool = formats.filter(f => f.height <= 1440);
+      const visible = (pool.length ? pool : formats).slice(0, 3);
+      const picked = formats.find(f => f.id === selectedId);
+      // A niche choice stays on screen, or the selection becomes invisible.
+      if (picked && !visible.includes(picked)) {
+        visible.push(picked);
+        visible.sort((a, b) => b.height - a.height);
+      }
+      return { visible, hidden: formats.filter(f => !visible.includes(f)) };
+    }
+
+    function defaultFormatId(formats) {
+      // Whatever leads the row, so the default follows what is shown.
+      return splitFormats(formats || []).visible[0]?.id || null;
+    }
+
     function fmtDur(s) {
       if (!s) return '';
       const m = Math.floor(s / 60);
@@ -176,7 +201,7 @@
               duration: data.duration,
               uploader: data.uploader || '',
               formats: data.formats || [],
-              selectedFormatId: data.formats?.[0]?.id || null,
+              selectedFormatId: defaultFormatId(data.formats),
             };
           }
         } catch (err) {
@@ -261,9 +286,16 @@
       const picking = ['ready', 'gone', 'error'].includes(c.status);
       let qualityChips = '';
       if (picking && !isAudio && c.formats && c.formats.length > 1) {
-        qualityChips = c.formats.map(f =>
-          `<button class="q-chip${f.id === c.selectedFormatId ? ' active' : ''}" onclick="pickFormat(${idx}, '${f.id}')">${f.label}</button>`
+        const split = splitFormats(c.formats, c.selectedFormatId);
+        const shown = c.showAllFormats ? c.formats : split.visible;
+        qualityChips = shown.map(f =>
+          `<button class="q-chip${f.id === c.selectedFormatId ? ' active' : ''}" onclick="pickFormat(${idx}, '${f.id}')">${f.label}${
+            f.size ? `<span class="q-size">${fmtSize(f.size)}</span>` : ''}</button>`
         ).join('');
+        if (!c.showAllFormats && split.hidden.length) {
+          qualityChips += `<button class="q-chip q-more" onclick="showAllFormats(${idx})"
+            title="Other resolutions">+${split.hidden.length}</button>`;
+        }
       }
 
       /* Three fixed zones: thumbnail, text, actions. Nothing shares a line
@@ -335,6 +367,13 @@
 
     function pickFormat(idx, formatId) {
       cardData[idx].selectedFormatId = formatId;
+      // Choosing folds the row back: the point of unfolding is gone.
+      cardData[idx].showAllFormats = false;
+      renderCard(idx);
+    }
+
+    function showAllFormats(idx) {
+      cardData[idx].showAllFormats = true;
       renderCard(idx);
     }
 
@@ -527,7 +566,7 @@
           description: e.description || '',
           upload_date: e.upload_date || '',
           formats: e.formats || [],
-          selectedFormatId: e.format_id || e.formats?.[0]?.id || null,
+          selectedFormatId: e.format_id || defaultFormatId(e.formats),
           jobId: e.job_id,
           filename: e.filename,
           error: e.error,

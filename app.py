@@ -506,6 +506,9 @@ def get_info():
                 "id": f["format_id"],
                 "label": f"{height}p",
                 "height": height,
+                # Video stream only, and often an estimate. It is an order of
+                # magnitude, not an accounting figure.
+                "size": f.get("filesize") or f.get("filesize_approx"),
             })
         formats.sort(key=lambda x: x["height"], reverse=True)
 
