@@ -50,9 +50,12 @@
     </div>
 
     <div class="footer">
-      YouTube &middot; TikTok &middot; Instagram &middot; Twitter/X &middot; Reddit &middot; Facebook<br>
-      Vimeo &middot; Twitch &middot; Dailymotion &middot; SoundCloud &middot; Loom &middot; Streamable<br>
-      Pinterest &middot; Tumblr &middot; Threads &middot; LinkedIn &middot; 1000+ more
+      <span id="sites">YouTube &middot; TikTok &middot; Instagram &middot; Reddit</span><button
+        class="link-btn" id="moreSites" onclick="showAllSites()">+1000</button>
+      <div class="footer-note">
+        The hard part is done by
+        <a href="https://github.com/yt-dlp/yt-dlp" target="_blank" rel="noopener">yt-dlp</a>
+      </div>
     </div>
   </div>
 
@@ -357,6 +360,14 @@
           ${primary}
         </div>
       `;
+    }
+
+    function showAllSites() {
+      document.getElementById('sites').innerHTML =
+        ['YouTube', 'TikTok', 'Instagram', 'Twitter/X', 'Reddit', 'Facebook', 'Vimeo',
+         'Twitch', 'Dailymotion', 'SoundCloud', 'Loom', 'Streamable', 'Pinterest',
+         'Tumblr', 'Threads', 'LinkedIn'].join(' &middot; ') + ' &middot; and a thousand more';
+      document.getElementById('moreSites').hidden = true;
     }
 
     function readyCount() {

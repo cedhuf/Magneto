@@ -798,6 +798,18 @@ audio.player-media {
   text-transform: uppercase;
   line-height: 1.8;
 }
+.footer-note {
+  margin-top: 2px;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  opacity: 0.8;
+}
+.footer-note a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+.footer-note a:hover { border-bottom-color: var(--accent); }
 
 /* Mobile */
 @media (max-width: 720px) {
