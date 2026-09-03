@@ -41,6 +41,11 @@
 
     <div id="cards" class="cards"></div>
 
+    <div id="history-section" class="history" hidden>
+      <div class="history-head">On the server</div>
+      <div id="history" class="cards"></div>
+    </div>
+
     <div class="footer">
       YouTube &middot; TikTok &middot; Instagram &middot; Twitter/X &middot; Reddit &middot; Facebook<br>
       Vimeo &middot; Twitch &middot; Dailymotion &middot; SoundCloud &middot; Loom &middot; Streamable<br>
@@ -100,8 +105,12 @@
       const container = document.getElementById('cards');
       btn.disabled = true;
       btn.textContent = 'Loading...';
+      // Clear the workspace only. Indexes stay valid because the entries are
+      // marked rather than removed; the history cards keep working.
       container.innerHTML = '';
-      cardData = [];
+      cardData.forEach((c, i) => {
+        if (c.zone !== 'history') c.discarded = true;
+      });
 
       // Check if youtube playlist URL
       for (let i = 0; i < urls.length; i++) {
@@ -152,7 +161,7 @@
         renderCard(idx);
       }
 
-      if (cardData.filter(c => c.status === 'ready').length > 1) {
+      if (cardData.filter(c => c.status === 'ready' && !c.discarded).length > 1) {
         renderDownloadAll();
       }
 
@@ -160,15 +169,24 @@
       btn.textContent = 'Fetch';
     }
 
+    /* Two zones: the workspace a Fetch fills, and what the server holds. A card
+       moves down to the history the moment its download lands. History is
+       always prepended, so restoring an oldest-first list and adding fresh
+       arrivals both end up newest first. */
     function renderCard(idx) {
       const c = cardData[idx];
+      const parent = document.getElementById(c.zone === 'history' ? 'history' : 'cards');
       let el = document.getElementById(`card-${idx}`);
       if (!el) {
         el = document.createElement('div');
         el.id = `card-${idx}`;
         el.className = 'card';
-        document.getElementById('cards').appendChild(el);
+        c.zone === 'history' ? parent.prepend(el) : parent.appendChild(el);
+      } else if (el.parentElement !== parent) {
+        parent.prepend(el);
       }
+      document.getElementById('history-section').hidden =
+        !document.getElementById('history').children.length;
 
       // Loading skeleton
       if (c.status === 'loading') {
@@ -318,6 +336,8 @@
             c.status = 'done';
             c.filename = data.filename;
             c.deleteAt = data.expires_in ? Date.now() + data.expires_in * 1000 : null;
+            // It is on the server now, so that is where the card belongs.
+            c.zone = 'history';
             renderCard(idx);
             // Asking to play should not also drop the file in the user's
             // Downloads folder; the Save button stays available for that.
@@ -356,7 +376,7 @@
       if (btn) { btn.disabled = true; btn.textContent = 'Downloading...'; }
 
       for (let i = 0; i < cardData.length; i++) {
-        if (cardData[i].status === 'ready') {
+        if (cardData[i].status === 'ready' && !cardData[i].discarded) {
           await dlCard(i);
         }
       }
@@ -401,6 +421,7 @@
           error: e.error,
           status: e.status === 'done' && !e.has_file ? 'gone' : e.status,
           deleteAt: e.expires_in ? Date.now() + e.expires_in * 1000 : null,
+          zone: 'history',
         };
         const idx = cardData.push(c) - 1;
         renderCard(idx);

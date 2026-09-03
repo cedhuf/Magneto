@@ -234,6 +234,17 @@ textarea::placeholder { color: var(--muted); }
 /* Cards */
 .cards { margin-top: 24px; }
 
+.history { margin-top: 40px; }
+.history-head {
+  font-size: 0.68rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--card-border);
+}
+.history .cards { margin-top: 14px; }
+
 .card {
   display: flex;
   gap: 14px;
