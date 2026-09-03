@@ -146,12 +146,16 @@
       // The bar belongs to the batch that is leaving, not to the next one.
       const bar = document.getElementById('dl-all-bar');
       if (bar) bar.remove();
-      // Nothing on screen is thrown away: a card the server knows about moves
-      // down to the history, the rest (failed lookups, skeletons) goes.
+      // The history is what the server holds a file for. A fetched card that
+      // was never downloaded has no file, so it stays in the workspace, below
+      // the batch about to arrive. Skeletons and failed lookups go.
+      const carried = [];
       cardData.forEach((c, i) => {
         if (c.zone === 'history') return;
         const el = document.getElementById(`card-${i}`);
-        if (c.jobId) {
+        if (c.status === 'ready') {
+          if (el) carried.push(el);
+        } else if (c.jobId) {
           c.zone = 'history';
           renderCard(i);
         } else {
@@ -210,9 +214,12 @@
         renderCard(idx);
       }
 
-      if (cardData.filter(c => c.status === 'ready' && !c.discarded).length > 1) {
-        renderDownloadAll();
-      }
+      // Appending moves the nodes, which puts the carried-over cards under the
+      // batch that was just fetched.
+      const container = document.getElementById('cards');
+      carried.forEach(el => container.appendChild(el));
+
+      if (readyCount() > 1) renderDownloadAll();
 
       btn.disabled = false;
       btn.textContent = 'Fetch';
@@ -352,6 +359,10 @@
           ${entryActions(idx, c)}
         </div>
       `;
+    }
+
+    function readyCount() {
+      return cardData.filter(c => c.status === 'ready' && !c.discarded).length;
     }
 
     function renderDownloadAll() {
@@ -571,14 +582,17 @@
           filename: e.filename,
           error: e.error,
           pinned: e.pinned,
+          // Never downloaded means nothing on the server, so it belongs to the
+          // workspace and not to the history.
+          zone: e.status === 'ready' ? 'work' : 'history',
           status: e.status === 'done' && !e.has_file ? 'gone' : e.status,
           deleteAt: e.expires_in ? Date.now() + e.expires_in * 1000 : null,
-          zone: 'history',
         };
         const idx = cardData.push(c) - 1;
         renderCard(idx);
         if (c.status === 'downloading') pollCard(idx);
       }
+      if (readyCount() > 1) renderDownloadAll();
     }
 
     /* Who is signed in, and where to sign out. Both only mean something behind
