@@ -283,7 +283,7 @@ textarea::placeholder { color: var(--muted); }
   letter-spacing: 0.03em;
   text-transform: uppercase;
 }
-.pill.active { background: var(--fg); color: var(--bg); }
+.pill.active { background: var(--fg-wash); color: var(--accent); }
 .pill:not(.active):hover { color: var(--fg); }
 
 .fetch-btn {
@@ -413,8 +413,10 @@ textarea::placeholder { color: var(--muted); }
   background: var(--card);
   overflow: hidden;
   margin-bottom: 10px;
+  transition: border-color 0.16s ease, transform 0.16s ease;
   animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
+.card:hover { border-color: var(--muted); }
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
@@ -667,11 +669,11 @@ audio.player-media {
 }
 
 .card-dl-btn {
-  padding: 6px 14px;
-  border: none;
+  padding: 5px 14px;
+  border: 1.5px solid var(--accent);
   border-radius: 7px;
-  background: var(--fg);
-  color: var(--bg);
+  background: transparent;
+  color: var(--accent);
   font-family: 'DM Mono', monospace;
   font-size: 0.7rem;
   font-weight: 500;
@@ -680,10 +682,8 @@ audio.player-media {
   letter-spacing: 0.03em;
   text-transform: uppercase;
 }
-.card-dl-btn:hover { background: var(--btn-hover); }
+.card-dl-btn:hover { background: var(--accent); color: var(--on-accent); }
 .card-dl-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.card-dl-btn.done { background: var(--success); color: var(--on-accent); }
-.card-dl-btn.error { background: var(--error); color: var(--on-accent); }
 
 .card-status {
   font-size: 0.68rem;
@@ -717,9 +717,9 @@ audio.player-media {
   transition: all 0.2s;
 }
 .q-chip.active {
-  border-color: var(--fg);
-  color: var(--fg);
-  background: var(--fg-wash);
+  border-color: var(--accent);
+  color: var(--accent);
+  background: transparent;
 }
 .q-chip:hover:not(.active) { border-color: var(--muted); }
 
@@ -762,11 +762,11 @@ audio.player-media {
 }
 .dl-all-btn {
   flex: 1;
-  padding: 12px;
-  border: none;
+  padding: 11px;
+  border: 1.5px solid var(--accent);
   border-radius: 10px;
-  background: var(--fg);
-  color: var(--bg);
+  background: transparent;
+  color: var(--accent);
   font-family: 'DM Mono', monospace;
   font-size: 0.82rem;
   font-weight: 500;
@@ -775,7 +775,7 @@ audio.player-media {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.dl-all-btn:hover { background: var(--btn-hover); }
+.dl-all-btn:hover { background: var(--accent); color: var(--on-accent); }
 .dl-all-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .spin {
@@ -840,15 +840,15 @@ audio.player-media {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: none;
+  border: 1.5px solid transparent;
   border-radius: 6px;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  transition: color 0.2s, background 0.2s;
+  transition: color 0.2s, border-color 0.2s;
 }
 .icon-btn svg { width: 14px; height: 14px; }
-.icon-btn:hover { color: var(--fg); background: var(--fg-wash); }
+.icon-btn:hover { color: var(--fg); border-color: var(--card-border); }
 .icon-btn.on { color: var(--accent); }
-.icon-btn.danger:hover { color: var(--error); }
+.icon-btn.danger:hover { color: var(--error); border-color: var(--error-border); }
 
