@@ -5,6 +5,7 @@ import glob
 import json
 import subprocess
 import threading
+from urllib.parse import urlparse
 from flask import Flask, request, jsonify, send_file, render_template
 
 app = Flask(__name__)
@@ -16,6 +17,20 @@ MAX_FILE_AGE = int(os.environ.get("RECLIP_MAX_FILE_AGE", 6 * 3600))
 SWEEP_INTERVAL = 60
 
 jobs = {}
+
+
+def is_safe_url(url):
+    """Reject anything that is not a plain http(s) URL.
+
+    yt-dlp reads an argv item starting with "-" as an option, so a URL of
+    "--exec=..." would run a command. Every invocation also passes "--" before
+    the URL; this check exists to answer with a 400 rather than a yt-dlp error.
+    """
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    return parsed.scheme in ("http", "https") and bool(parsed.netloc)
 
 
 def parse_ytdlp_json(stdout):
@@ -91,7 +106,7 @@ def run_download(job_id, url, format_choice, format_id):
     else:
         cmd += ["-f", "bestvideo+bestaudio/best", "--merge-output-format", "mp4"]
 
-    cmd.append(url)
+    cmd += ["--", url]
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
@@ -149,8 +164,10 @@ def get_info():
     url = data.get("url", "").strip()
     if not url:
         return jsonify({"error": "No URL provided"}), 400
+    if not is_safe_url(url):
+        return jsonify({"error": "Invalid URL"}), 400
 
-    cmd = ["yt-dlp", "--no-playlist", "-j", url]
+    cmd = ["yt-dlp", "--no-playlist", "-j", "--", url]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         if result.returncode != 0:
@@ -195,8 +212,10 @@ def get_playlist_info():
     url = data.get("url", "").strip()
     if not url:
         return jsonify({"error": "No URL provided"}), 400
+    if not is_safe_url(url):
+        return jsonify({"error": "Invalid URL"}), 400
 
-    cmd = ["yt-dlp", "--flat-playlist", "-J", url]
+    cmd = ["yt-dlp", "--flat-playlist", "-J", "--", url]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         if result.returncode != 0:
@@ -222,6 +241,8 @@ def start_download():
 
     if not url:
         return jsonify({"error": "No URL provided"}), 400
+    if not is_safe_url(url):
+        return jsonify({"error": "Invalid URL"}), 400
 
     job_id = uuid.uuid4().hex[:10]
     jobs[job_id] = {"status": "downloading", "url": url, "title": title}
