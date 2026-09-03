@@ -1,4 +1,9 @@
+/* Light is the base. The dark palette is written twice on purpose: once for the
+   system preference, once for an explicit choice, and CSS offers no way to
+   share one block between a media query and an attribute selector. Keep them
+   in step. */
 :root {
+  color-scheme: light;
   --bg: #f4f1eb;
   --fg: #3a3a38;
   --accent: #e85d2a;
@@ -20,6 +25,56 @@
   --noise-opacity: 0.03;
   --radius: 14px;
   --shimmer: linear-gradient(90deg, var(--shimmer-base) 25%, var(--shimmer-highlight) 50%, var(--shimmer-base) 75%);
+}
+
+/* System preference, unless an explicit choice says otherwise. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #1b1a17;
+    --fg: #ece7dd;
+    --accent: #f2703d;
+    --accent-hover: #ff8756;
+    --muted: #918c7e;
+    --card: #22211c;
+    --card-border: #35332c;
+    --success: #4fae74;
+    --error: #e2696a;
+    --on-accent: #1b1a17;
+    --btn-hover: #ffffff;
+    --accent-ring: rgba(242, 112, 61, 0.18);
+    --fg-wash: rgba(236, 231, 221, 0.07);
+    --error-border: rgba(226, 105, 106, 0.28);
+    --error-wash: rgba(226, 105, 106, 0.06);
+    --error-wash-strong: rgba(226, 105, 106, 0.12);
+    --shimmer-base: #26241e;
+    --shimmer-highlight: #302d26;
+    --noise-opacity: 0.02;
+  }
+}
+
+/* Explicit choice, which must win in both directions. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1b1a17;
+  --fg: #ece7dd;
+  --accent: #f2703d;
+  --accent-hover: #ff8756;
+  --muted: #918c7e;
+  --card: #22211c;
+  --card-border: #35332c;
+  --success: #4fae74;
+  --error: #e2696a;
+  --on-accent: #1b1a17;
+  --btn-hover: #ffffff;
+  --accent-ring: rgba(242, 112, 61, 0.18);
+  --fg-wash: rgba(236, 231, 221, 0.07);
+  --error-border: rgba(226, 105, 106, 0.28);
+  --error-wash: rgba(226, 105, 106, 0.06);
+  --error-wash-strong: rgba(226, 105, 106, 0.12);
+  --shimmer-base: #26241e;
+  --shimmer-highlight: #302d26;
+  --noise-opacity: 0.02;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -48,7 +103,35 @@ body::after {
   padding: 60px 24px 80px;
 }
 
-.brand { margin-bottom: 48px; }
+.brand {
+  margin-bottom: 48px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.theme-btn {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--card-border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+.theme-btn:hover { color: var(--fg); border-color: var(--muted); }
+.theme-btn:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.theme-btn svg { width: 17px; height: 17px; }
 .brand h1 {
   font-family: 'Instrument Serif', serif;
   font-size: 4.2rem;
