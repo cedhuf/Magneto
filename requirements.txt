@@ -1,2 +1,4 @@
 flask
-yt-dlp
+# default: the yt-dlp-ejs solver scripts, pinned by yt-dlp to the exact version
+# it expects. deno: the JavaScript engine that runs them.
+yt-dlp[default,deno]

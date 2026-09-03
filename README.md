@@ -67,9 +67,10 @@ YouTube, TikTok, Instagram, Twitter/X, Reddit, Facebook, Vimeo, Twitch, Dailymot
 - **Backend:** Python + Flask (~150 lines)
 - **Frontend:** Vanilla HTML/CSS/JS (single file, no build step)
 - **Download engine:** [yt-dlp](https://github.com/yt-dlp/yt-dlp) + [ffmpeg](https://ffmpeg.org/)
-- **JavaScript runtime:** [deno](https://deno.com/), shipped in the image because
-  yt-dlp needs an engine to solve YouTube's player challenge. Without one it
-  silently falls back to clients YouTube may refuse, and formats go missing.
+- **JavaScript runtime:** [deno](https://deno.com/) and the solver scripts, both
+  from `yt-dlp[default,deno]`. YouTube's player challenge needs a real JS engine;
+  without one yt-dlp falls back to clients YouTube may refuse, and formats go
+  missing behind a misleading "This video is unavailable".
 - **Dependencies:** 2 (Flask, yt-dlp)
 
 ## Disclaimer
