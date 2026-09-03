@@ -373,11 +373,16 @@ def youtube_videos_url(url):
 
 
 def fetch_channel(url):
-    """Return the five newest videos without resolving each one separately."""
+    """Return the five newest videos with their actual metadata.
+
+    Flat playlist entries are quick but YouTube routinely leaves their publish
+    dates blank. There are only five entries, so resolving them is the small,
+    reliable trade-off for a feed that can be sorted and dated.
+    """
     videos_url = youtube_videos_url(url)
     if not videos_url:
         raise ValueError("Please enter a YouTube channel URL")
-    cmd = ["yt-dlp", "--flat-playlist", "--playlist-end", "5", "-J", "--", videos_url]
+    cmd = ["yt-dlp", "--playlist-end", "5", "-J", "--", videos_url]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
     if result.returncode != 0:
         raise ValueError(result.stderr.strip().split("\n")[-1])
@@ -395,12 +400,15 @@ def fetch_channel(url):
             videos.append({
                 "url": video_url,
                 "title": entry.get("title") or "Untitled",
-                # Flat channel entries often omit the thumbnail even though
+                # Some playlist entries omit the thumbnail even though
                 # YouTube exposes a stable image for every video id.
                 "thumbnail": entry.get("thumbnail") or (
                     f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg" if video_id else ""
                 ),
-                "upload_date": entry.get("upload_date") or "",
+                "upload_date": entry.get("upload_date") or (
+                    time.strftime("%Y%m%d", time.gmtime(entry["timestamp"]))
+                    if entry.get("timestamp") else ""
+                ),
                 "duration": entry.get("duration"),
             })
     return {
