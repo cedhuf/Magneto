@@ -89,17 +89,30 @@ def current_user():
     return user
 
 
+def user_groups():
+    return [g.strip() for g in (request.headers.get("Remote-Groups") or "").split(",")
+            if g.strip()]
+
+
 def is_admin():
     if AUTH_MODE != "proxy":
         return True
-    groups = (request.headers.get("Remote-Groups") or "").split(",")
-    return ADMIN_GROUP in [g.strip() for g in groups]
+    return ADMIN_GROUP in user_groups()
 
 
 def require_admin():
     current_user()
-    if not is_admin():
-        abort(403)
+    if is_admin():
+        return
+    # A bare 403 cannot tell "the group is missing from the provider" from
+    # "the proxy is not copying the header", which are fixed in different
+    # places. Showing the caller its own groups gives that away for free.
+    groups = user_groups()
+    if groups:
+        detail = f"groups received: {', '.join(groups)}"
+    else:
+        detail = "no groups received at all, so the proxy is not copying Remote-Groups"
+    abort(403, f"Admin needs the {ADMIN_GROUP} group. For {current_user()}, {detail}.")
 
 
 def file_size(path):

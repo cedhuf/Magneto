@@ -27,7 +27,7 @@
       </div>
       <div class="brand-actions">
         <span class="text-btn" id="who" hidden></span>
-        <a class="text-btn" href="/admin">Admin</a>
+        <a class="text-btn" id="adminLink" href="/admin" hidden>Admin</a>
         <a class="text-btn" id="logoutLink" href="#" hidden>Sign out</a>
         <button class="theme-btn" id="theme-btn" onclick="cycleTheme()" type="button"></button>
       </div>
@@ -491,6 +491,8 @@
         const res = await fetch('/api/me');
         if (!res.ok) return;
         const me = await res.json();
+        // The link follows the right, so it cannot offer a page that answers 403.
+        document.getElementById('adminLink').hidden = !me.admin;
         if (me.auth !== 'proxy') return;
         const who = document.getElementById('who');
         who.textContent = me.user;
