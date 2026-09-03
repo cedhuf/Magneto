@@ -1,4 +1,5 @@
 import os
+import time
 import uuid
 import glob
 import json
@@ -9,6 +10,10 @@ from flask import Flask, request, jsonify, send_file, render_template
 app = Flask(__name__)
 DOWNLOAD_DIR = os.path.join(os.path.dirname(__file__), "downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+GRACE_AFTER_FETCH = int(os.environ.get("RECLIP_GRACE_AFTER_FETCH", 300))
+MAX_FILE_AGE = int(os.environ.get("RECLIP_MAX_FILE_AGE", 6 * 3600))
+SWEEP_INTERVAL = 60
 
 jobs = {}
 
@@ -27,6 +32,50 @@ def parse_ytdlp_json(stdout):
             continue
         return json.loads(line)
     raise ValueError("yt-dlp returned no data")
+
+
+def remove_quietly(path):
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
+def sweep_downloads():
+    """Drop fetched jobs past their grace period, then every file left over.
+
+    Job ids only exist in this process, so a file whose id is unknown belongs
+    to a previous run and is unreachable: at startup that is the whole
+    directory. This assumes the single gunicorn worker the Dockerfile declares.
+    """
+    now = time.time()
+
+    for job_id, job in list(jobs.items()):
+        expires_at = job.get("expires_at")
+        if expires_at and now >= expires_at:
+            jobs.pop(job_id, None)
+
+    for path in glob.glob(os.path.join(DOWNLOAD_DIR, "*")):
+        job_id = os.path.basename(path).split(".")[0]
+        try:
+            age = now - os.path.getmtime(path)
+        except OSError:
+            continue
+        if job_id in jobs and age < MAX_FILE_AGE:
+            continue
+        remove_quietly(path)
+
+
+def janitor():
+    while True:
+        try:
+            sweep_downloads()
+        except Exception as e:
+            app.logger.warning("sweep failed: %s", e)
+        time.sleep(SWEEP_INTERVAL)
+
+
+threading.Thread(target=janitor, daemon=True).start()
 
 
 def run_download(job_id, url, format_choice, format_id):
@@ -201,7 +250,11 @@ def download_file(job_id):
     job = jobs.get(job_id)
     if not job or job["status"] != "done":
         return jsonify({"error": "File not ready"}), 404
-    return send_file(job["file"], as_attachment=True, download_name=job["filename"])
+    response = send_file(job["file"], as_attachment=True, download_name=job["filename"])
+    # The body is still being streamed when this returns, so the file can only
+    # go later; a second fetch within the grace period pushes the deadline back.
+    job["expires_at"] = time.time() + GRACE_AFTER_FETCH
+    return response
 
 
 if __name__ == "__main__":

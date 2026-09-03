@@ -44,6 +44,18 @@ docker build -t reclip . && docker run -p 8899:8899 reclip
 4. Select quality/resolution if available
 5. Click **Download** on individual videos, or **Download All**
 
+## Retention
+
+Downloads are temporary. A file is deleted five minutes after it has been
+fetched, and any file still around after six hours goes too, fetched or not.
+Files left by a previous run are removed at startup, since their job ids died
+with the process.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `RECLIP_GRACE_AFTER_FETCH` | `300` | Seconds kept after a fetch, so the transfer can finish |
+| `RECLIP_MAX_FILE_AGE` | `21600` | Age at which a file is swept regardless |
+
 ## Supported Sites
 
 Anything [yt-dlp supports](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md), including:
