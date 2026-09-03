@@ -1,5 +1,8 @@
 .git
 .gitignore
+.forgejo
+_local
+assets
 downloads
 __pycache__
 *.pyc
