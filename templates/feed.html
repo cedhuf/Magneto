@@ -37,12 +37,21 @@
     <div class="feed-grid" id="videos"></div>
     <div class="subscriptions" id="subscriptions" hidden>
       <div class="history-head">Channels</div>
-      <div id="channelList"></div>
+      <div class="channel-list" id="channelList"></div>
+    </div>
+  </div>
+  <div class="feed-modal" id="modal" hidden>
+    <div class="feed-modal-box" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="player-close feed-modal-close" onclick="closeVideo()" aria-label="Close">×</button>
+      <div id="modalMedia"></div>
+      <div class="feed-modal-body"><h2 id="modalTitle"></h2><div id="modalMeta" class="feed-video-meta"></div><p id="modalDescription"></p>
+        <a class="card-dl-btn" id="downloadLink">Download</a></div>
     </div>
   </div>
 
   <script>
     const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    let feedVideos = [];
     const esc = s => { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; };
     function date(s) { return s && s.length === 8 ? `${+s.slice(6)} ${MONTHS[+s.slice(4, 6) - 1]} ${s.slice(0, 4)}` : ''; }
     function duration(s) { return s ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` : ''; }
@@ -52,12 +61,13 @@
       const res = await fetch('/api/feed');
       if (!res.ok) return;
       const data = await res.json();
+      feedVideos = data.videos;
       const videos = document.getElementById('videos');
-      videos.innerHTML = data.videos.map(v => `<a class="feed-video" href="/?url=${encodeURIComponent(v.url)}">
+      videos.innerHTML = data.videos.map((v, i) => `<button class="feed-video" type="button" onclick="openVideo(${i})">
         <div class="feed-thumb">${v.thumbnail ? `<img src="${esc(v.thumbnail)}" alt="">` : ''}${date(v.upload_date) ? `<span class="feed-date">${date(v.upload_date)}</span>` : ''}${v.duration ? `<span class="feed-duration">${duration(v.duration)}</span>` : ''}</div>
         <div class="feed-video-body"><div class="feed-video-title">${esc(v.title)}</div>
         <div class="feed-video-meta">${esc(v.channel)}${date(v.upload_date) ? ` · ${date(v.upload_date)}` : ''}</div></div>
-      </a>`).join('');
+      </button>`).join('');
       document.getElementById('feedHead').hidden = !data.channels.length;
       document.getElementById('videoCount').textContent = `${data.videos.length} latest video${data.videos.length === 1 ? '' : 's'}`;
       const list = document.getElementById('channelList');
@@ -82,6 +92,31 @@
       const res = await fetch('/api/feed/refresh', {method: 'POST'}); const data = await res.json();
       message(data.error || 'Feed refreshed.', !!data.error); await load(); button.disabled = false; button.textContent = 'Refresh feed';
     });
+    function openVideo(index) {
+      const video = feedVideos[index];
+      const modal = document.getElementById('modal');
+      document.getElementById('modalTitle').textContent = video.title;
+      document.getElementById('modalMeta').textContent = [video.channel, date(video.upload_date)].filter(Boolean).join(' · ');
+      document.getElementById('modalDescription').textContent = video.description || 'No description.';
+      document.getElementById('downloadLink').href = `/?url=${encodeURIComponent(video.url)}`;
+      const media = document.getElementById('modalMedia');
+      media.innerHTML = `<button class="feed-modal-thumb" type="button" onclick="playVideo(${index})">${video.thumbnail ? `<img src="${esc(video.thumbnail)}" alt="">` : ''}<span class="feed-play">▶</span></button>`;
+      modal.hidden = false;
+      document.body.style.overflow = 'hidden';
+    }
+    function playVideo(index) {
+      const video = feedVideos[index];
+      if (!video.id) return;
+      document.getElementById('modalMedia').innerHTML = `<iframe class="feed-player" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(video.id)}?autoplay=1" title="${esc(video.title)}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
+    }
+    function closeVideo() {
+      document.getElementById('modal').hidden = true;
+      document.getElementById('modalMedia').textContent = '';
+      document.body.style.overflow = '';
+    }
+    document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeVideo(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeVideo(); });
+
     async function removeChannel(id) {
       if (!confirm('Remove this channel from your feed?')) return;
       await fetch(`/api/feed/subscriptions/${encodeURIComponent(id)}`, {method: 'DELETE'}); load();

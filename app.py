@@ -410,6 +410,8 @@ def fetch_channel(url):
                     if entry.get("timestamp") else ""
                 ),
                 "duration": entry.get("duration"),
+                "description": entry.get("description") or "",
+                "id": video_id or "",
             })
     return {
         "channel_id": str(channel_id),
