@@ -228,7 +228,8 @@
         actionHtml = `<span class="card-status downloading"><span class="spin"></span> Downloading...</span>`;
       } else if (c.status === 'done') {
         actionHtml = `<button class="card-dl-btn done" onclick="saveCard(${idx})">Save</button>
-          <span class="card-status done">${esc(c.filename || '')}</span>`;
+          <span class="card-status done">${esc(c.filename || '')}</span>
+          <span class="card-ttl" id="ttl-${idx}">${ttlLabel(c)}</span>`;
       } else if (c.status === 'error') {
         actionHtml = `<button class="card-dl-btn" onclick="dlCard(${idx})">Retry</button>
           <span class="card-status error">${esc(friendlyError(c.error || 'Download failed'))}</span>`;
@@ -309,6 +310,7 @@
             clearInterval(iv);
             c.status = 'done';
             c.filename = data.filename;
+            c.deleteAt = data.expires_in ? Date.now() + data.expires_in * 1000 : null;
             renderCard(idx);
             // Asking to play should not also drop the file in the user's
             // Downloads folder; the Save button stays available for that.
@@ -340,6 +342,7 @@
       a.href = `/api/file/${c.jobId}`;
       a.download = c.filename || '';
       a.click();
+      setTimeout(() => refreshTtl(idx), 1500);
     }
 
     async function dlAll() {
@@ -354,6 +357,40 @@
 
       if (btn) { btn.disabled = false; btn.textContent = 'Download All'; }
     }
+
+    /* The server deletes a file some hours after it lands, so the card says
+       how long it will still be there. */
+    function ttlLabel(c) {
+      if (!c.deleteAt) return '';
+      const left = c.deleteAt - Date.now();
+      if (left <= 0) return 'deleted from server';
+      const h = Math.floor(left / 3600000);
+      const m = Math.floor(left / 60000) % 60;
+      if (h >= 48) return `on server ${Math.floor(h / 24)}d`;
+      return h ? `on server ${h}h ${m}m` : `on server ${m || 1}m`;
+    }
+
+    // Fetching restarts the 24h clock, so the label has to be re-read after a
+    // save or a play; otherwise the card keeps showing the untouched-file week.
+    async function refreshTtl(idx) {
+      const c = cardData[idx];
+      if (!c.jobId) return;
+      try {
+        const res = await fetch(`/api/status/${c.jobId}`);
+        const data = await res.json();
+        if (!data.expires_in) return;
+        c.deleteAt = Date.now() + data.expires_in * 1000;
+        const el = document.getElementById(`ttl-${idx}`);
+        if (el) el.textContent = ttlLabel(c);
+      } catch (e) {}
+    }
+
+    setInterval(() => {
+      cardData.forEach((c, idx) => {
+        const el = document.getElementById(`ttl-${idx}`);
+        if (el) el.textContent = ttlLabel(c);
+      });
+    }, 30000);
 
     /* Playback: the server file only. A card that has not been downloaded yet
        starts the download and plays when it lands. */
@@ -405,6 +442,7 @@
       overlay.querySelector('.player-close').addEventListener('click', close);
       document.addEventListener('keydown', onKey);
       document.body.appendChild(overlay);
+      setTimeout(() => refreshTtl(idx), 1500);
     }
 
     /* Theme: system, light, dark. "system" stores nothing and lets the

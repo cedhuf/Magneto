@@ -12,8 +12,10 @@ app = Flask(__name__)
 DOWNLOAD_DIR = os.path.join(os.path.dirname(__file__), "downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-GRACE_AFTER_FETCH = int(os.environ.get("RECLIP_GRACE_AFTER_FETCH", 300))
-MAX_FILE_AGE = int(os.environ.get("RECLIP_MAX_FILE_AGE", 6 * 3600))
+GRACE_AFTER_FETCH = int(os.environ.get("RECLIP_GRACE_AFTER_FETCH", 24 * 3600))
+# Only a backstop, for files nobody ever fetched. Its exact value matters
+# little; it exists so nothing sits there for a month.
+MAX_FILE_AGE = int(os.environ.get("RECLIP_MAX_FILE_AGE", 7 * 24 * 3600))
 SWEEP_INTERVAL = 60
 
 jobs = {}
@@ -79,6 +81,19 @@ def sweep_downloads():
         if job_id in jobs and age < MAX_FILE_AGE:
             continue
         remove_quietly(path)
+        # Forget the job with its file, or the card keeps offering a dead link.
+        jobs.pop(job_id, None)
+
+
+def seconds_left(job):
+    """Seconds until the sweep takes this job's file, mirroring its two rules."""
+    try:
+        deadline = os.path.getmtime(job["file"]) + MAX_FILE_AGE
+    except (OSError, KeyError):
+        return 0
+    if job.get("expires_at"):
+        deadline = min(deadline, job["expires_at"])
+    return max(0, int(deadline - time.time()))
 
 
 def janitor():
@@ -266,6 +281,7 @@ def check_status(job_id):
         "status": job["status"],
         "error": job.get("error"),
         "filename": job.get("filename"),
+        "expires_in": seconds_left(job) if job["status"] == "done" else None,
     })
 
 

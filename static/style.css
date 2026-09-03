@@ -455,6 +455,13 @@ audio.player-media {
 .card-status.downloading { color: var(--accent); }
 .card-status.done { color: var(--success); }
 .card-status.error { color: var(--error); }
+.card-ttl {
+  font-size: 0.64rem;
+  color: var(--muted);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
 
 .q-chip {
   padding: 4px 10px;
