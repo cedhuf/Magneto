@@ -69,6 +69,10 @@ MIGRATIONS = [
     """
     ALTER TABLE entries ADD COLUMN formats TEXT;
     """,
+    """
+    ALTER TABLE entries ADD COLUMN uploader TEXT;
+    ALTER TABLE entries ADD COLUMN duration REAL;
+    """,
 ]
 
 
@@ -161,6 +165,8 @@ def entry_json(row):
         "url": row["url"],
         "title": row["title"],
         "thumbnail": row["thumbnail"],
+        "uploader": row["uploader"],
+        "duration": row["duration"],
         "format": row["format"],
         "format_id": row["format_id"],
         "formats": json.loads(row["formats"]) if row["formats"] else [],
@@ -426,29 +432,31 @@ def delete_entry(job_id):
     return jsonify({"ok": True})
 
 
-def remember(owner, url, title, thumbnail, formats):
+def remember(owner, url, info):
     """Record a fetched URL, so it survives the tab without being downloaded.
 
     Fetching the same URL twice returns the same row rather than a second card,
     which also means a URL already downloaded comes back with its state. The
-    quality list is stored with it, otherwise a restored card could only offer
-    the default format.
+    whole card is stored, quality list included: whatever is missing here is
+    what a restored card will not be able to show.
     """
-    encoded = json.dumps(formats)
+    values = (info["title"], info["thumbnail"], json.dumps(info["formats"]),
+              info["uploader"], info["duration"])
     with connect() as conn:
         row = conn.execute(
             "SELECT job_id FROM entries WHERE owner = ? AND url = ?"
             " ORDER BY created_at DESC LIMIT 1", (owner, url)).fetchone()
         if row:
-            conn.execute("UPDATE entries SET title = ?, thumbnail = ?, formats = ?"
-                         " WHERE job_id = ?",
-                         (title, thumbnail, encoded, row["job_id"]))
+            conn.execute("UPDATE entries SET title = ?, thumbnail = ?, formats = ?,"
+                         " uploader = ?, duration = ? WHERE job_id = ?",
+                         (*values, row["job_id"]))
             return row["job_id"]
         job_id = uuid.uuid4().hex[:10]
         conn.execute(
             "INSERT INTO entries (job_id, owner, url, title, thumbnail, formats,"
-            " status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'ready', ?)",
-            (job_id, owner, url, title, thumbnail, encoded, time.time()))
+            " uploader, duration, status, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ready', ?)",
+            (job_id, owner, url, *values, time.time()))
         return job_id
 
 
@@ -488,16 +496,14 @@ def get_info():
             })
         formats.sort(key=lambda x: x["height"], reverse=True)
 
-        title = info.get("title", "")
-        thumbnail = info.get("thumbnail", "")
-        return jsonify({
-            "job_id": remember(owner, url, title, thumbnail, formats),
-            "title": title,
-            "thumbnail": thumbnail,
+        card = {
+            "title": info.get("title", ""),
+            "thumbnail": info.get("thumbnail", ""),
             "duration": info.get("duration"),
             "uploader": info.get("uploader", ""),
             "formats": formats,
-        })
+        }
+        return jsonify({"job_id": remember(owner, url, card), **card})
     except subprocess.TimeoutExpired:
         return jsonify({"error": "Timed out fetching video info"}), 400
     except Exception as e:
