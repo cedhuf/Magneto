@@ -8,3 +8,5 @@ assets/*.mov
 .env.local
 .env.production
 .env.development
+# Local working notes, not part of the project
+_local/
