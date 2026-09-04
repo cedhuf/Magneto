@@ -861,6 +861,18 @@ def get_info():
                 if height not in best_by_height or rank(f) > rank(best_by_height[height]):
                     best_by_height[height] = f
 
+        duration = info.get("duration") or 0
+
+        def approx_size(f):
+            """yt-dlp leaves filesize empty on several formats, including the
+            high-bitrate H.264 we now prefer. Bitrate times duration matches the
+            announced sizes to the decimal wherever both exist."""
+            known = f.get("filesize") or f.get("filesize_approx")
+            if known:
+                return known
+            tbr = f.get("tbr") or 0
+            return int(tbr * 125 * duration) or None
+
         formats = []
         for height, f in best_by_height.items():
             formats.append({
@@ -869,7 +881,7 @@ def get_info():
                 "height": height,
                 # Video stream only, and often an estimate. It is an order of
                 # magnitude, not an accounting figure.
-                "size": f.get("filesize") or f.get("filesize_approx"),
+                "size": approx_size(f),
                 "compatible": f.get("vcodec", "").startswith("avc1"),
             })
         formats.sort(key=lambda x: x["height"], reverse=True)
