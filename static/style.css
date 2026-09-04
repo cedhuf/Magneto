@@ -1001,6 +1001,7 @@ audio.modal-media {
 .shorts {
   --chrome: 285px;
   --stage: clamp(360px, calc(100dvh - var(--chrome)), 900px);
+  /* The cap is for a page that also holds a header. Full screen has none. */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1150,6 +1151,19 @@ audio.modal-media {
   text-transform: uppercase;
 }
 .shorts-meta svg { width: 12px; height: 12px; flex: 0 0 auto; }
+/* Full screen: the page keeps its markup and gives up everything that is not
+   the video. A class rather than the native API alone, because iOS has no
+   element fullscreen and would leave the reel behind. */
+body.full { background: var(--video-bg); }
+body.full .page { max-width: none; padding: 0; }
+body.full .brand,
+body.full .feed-head,
+body.full .hint { display: none; }
+body.full .shorts { --stage: 100dvh; }
+body.full .shorts-frame { border-radius: 0; }
+body.full .shorts-reel { border-radius: 0; }
+body.full .shorts-caption { border-radius: 0; }
+
 /* Only there when the browser refused the sound, and gone at the first tap. */
 .shorts-sound {
   grid-area: media;
