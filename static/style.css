@@ -1012,14 +1012,13 @@ audio.modal-media {
 .page:has(.shorts) { padding-bottom: 24px; }
 .shorts-frame {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  /* The caption shares the video's cell rather than taking a row of its own:
-     read over the image, it costs no height, which is the height the video
-     wanted. */
-  grid-template-areas: "media rail";
-  gap: 12px;
-  /* 44 for the rail, 12 for the gap: the frame is the video plus its controls. */
-  width: min(100%, calc(var(--stage) * 9 / 16 + 56px));
+  /* Everything but the video shares its cell: the caption, the date and the
+     controls are read over the image, so they cost no width and no height, and
+     the frame is exactly the video. */
+  position: relative;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "media";
+  width: min(100%, calc(var(--stage) * 9 / 16));
 }
 /* The reel scrolls, the browser snaps. scroll-snap-stop makes it stop on every
    slide, so a fast flick can never skip one, and the finger, the trackpad and
@@ -1079,47 +1078,46 @@ audio.modal-media {
 /* The controls sit beside the video rather than on it, as round buttons: the
    shape says they are for moving, not for the page. */
 .shorts-rail {
-  grid-area: rail;
+  position: absolute;
+  right: 10px;
+  bottom: 12px;
+  z-index: 2;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  align-self: end;
-  padding-bottom: 4px;
+  gap: 8px;
 }
-.round-btn,
-.shorts-rail .icon-btn {
-  width: 44px;
-  height: 44px;
+/* Where a pointer summons the browser's own controls, the rail sits above the
+   bar they draw rather than under it. */
+@media (hover: hover) {
+  .shorts-rail { bottom: 46px; }
+}
+/* Read over the video, so they carry their own ground rather than the page's. */
+.round-btn {
+  width: 36px;
+  height: 36px;
   min-height: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1.5px solid var(--card-border);
+  border: none;
   border-radius: 50%;
-  background: var(--card);
-  color: var(--fg);
+  background: var(--scrim-strong);
+  color: var(--on-scrim);
   cursor: pointer;
-  transition: border-color 0.16s ease, color 0.16s ease, transform 0.1s ease;
+  transition: background 0.16s ease, color 0.16s ease, transform 0.1s ease;
 }
-.round-btn svg,
-.shorts-rail .icon-btn svg { width: 20px; height: 20px; }
-.round-btn:hover:not(:disabled),
-.shorts-rail .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+.round-btn svg { width: 17px; height: 17px; }
+.round-btn:hover:not(:disabled) { color: var(--accent); }
 .round-btn:active:not(:disabled) { transform: scale(0.94); }
-.round-btn:disabled { opacity: 0.35; cursor: default; }
+.round-btn:disabled { opacity: 0.3; cursor: default; }
 /* A live link is a state of the clip, not of the pointer. */
-.round-btn.on { border-color: var(--accent); color: var(--accent); }
-/* Round like its neighbours, red like itself. */
-.shorts-rail .del-btn.armed,
-.shorts-rail .del-btn.armed:hover {
-  border-color: var(--error);
-  color: var(--on-error);
-}
+.round-btn.on { color: var(--accent); }
 .shorts-caption {
   grid-area: media;
   align-self: end;
   z-index: 1;
-  padding: 40px 14px 12px;
+  /* Clear of the rail on the right, which shares this band. */
+  padding: 40px 58px 12px 14px;
   border-radius: 0 0 var(--radius) var(--radius);
   background: linear-gradient(to top, var(--scrim-strong), transparent);
   color: var(--on-scrim);
@@ -1152,6 +1150,22 @@ audio.modal-media {
   text-transform: uppercase;
 }
 .shorts-meta svg { width: 12px; height: 12px; flex: 0 0 auto; }
+/* The one thing worth knowing before watching: how old it is. */
+.shorts-date {
+  grid-area: media;
+  align-self: start;
+  justify-self: end;
+  z-index: 1;
+  margin: 10px 10px 0 0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--scrim-strong);
+  color: var(--on-scrim);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
 
 /* Cut into the page rather than laid on it: the page's own background, an inner
    shadow for the depth and a hairline below for the lit edge. */

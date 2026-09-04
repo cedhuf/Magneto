@@ -623,18 +623,22 @@ def run_download(job_id, url, format_choice, format_id, title, max_height=None,
     elif format_id:
         # Prefer m4a audio: Opus is legal in an mp4 container but Apple devices
         # read it poorly, and the merge is a stream copy either way.
-        cmd += ["-f", f"{format_id}+bestaudio[ext=m4a]/bestaudio/best",
+        cmd += ["-f", f"{format_id}+bestaudio[ext=m4a]/{format_id}+bestaudio/best",
                 "--merge-output-format", "mp4"]
     elif max_height:
         # The feed asks for a size rather than a format id: it never looked the
         # video up, so it has no ids to choose from. A short is filmed upright,
         # where "720p" names the width: bounding its height would ask for a
         # 405x720 copy of a 720x1280 video, or for nothing at all.
+        # A progressive file comes before merging with whatever audio is left:
+        # YouTube's is H.264 and AAC by construction, where that last merge can
+        # put Opus in an mp4, which an iPhone plays without any sound at all.
         side = "width" if vertical else "height"
         cmd += ["-f", f"bestvideo[{side}<={max_height}][vcodec^=avc1]+bestaudio[ext=m4a]/"
                       f"bestvideo[{side}<={max_height}]+bestaudio[ext=m4a]/"
-                      f"bestvideo[{side}<={max_height}]+bestaudio/"
-                      f"best[{side}<={max_height}]/best",
+                      f"best[{side}<={max_height}][vcodec^=avc1]/"
+                      f"best[{side}<={max_height}]/"
+                      f"bestvideo[{side}<={max_height}]+bestaudio/best",
                 "--merge-output-format", "mp4"]
     else:
         cmd += ["-f", "bestvideo+bestaudio/best", "--merge-output-format", "mp4"]

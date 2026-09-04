@@ -66,8 +66,9 @@ Nothing is embedded from YouTube.
 ### Shorts
 
 **Shorts** shows the shorts of the same channels, one at a time, in the shape
-they were filmed in. Down and up, or `j` and `k`, move between them, space
-pauses. There is nothing to save: a short is fetched when you reach it, one more
+they were filmed in, each looping until you move on. Down and up, or `j` and
+`k`, move between them, space pauses. The date, the title and the controls are
+read over the video rather than beside it, so the frame is the video. There is nothing to save: a short is fetched when you reach it, one more
 is fetched while you watch, and both are gone after `RECLIP_SHORTS_RETENTION`.
 They stay out of the downloads list and out of the history ceiling, and `/admin`
 shows them as one line with a purge of their own.
