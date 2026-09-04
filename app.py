@@ -31,6 +31,14 @@ PLAYLIST_MAX = int(os.environ.get("RECLIP_PLAYLIST_MAX", 50))
 FEED_VIDEOS_MAX = int(os.environ.get("RECLIP_FEED_VIDEOS", 5))
 FEED_DEFAULTS = {"videos": 3, "quality": 720}
 FEED_QUALITIES = [360, 480, 720, 1080, 1440]
+# YouTube bans by IP, and every subscription of every user leaves from the same
+# one. So the guard rails are instance-wide, never per account: one channel
+# refreshed at a time, at most one every FEED_POLL seconds, and only when its
+# cached copy is older than FEED_TTL.
+FEED_POLL = int(os.environ.get("RECLIP_FEED_POLL", 300))
+FEED_TTL = int(os.environ.get("RECLIP_FEED_TTL", 6 * 3600))
+FEED_COOLDOWN = int(os.environ.get("RECLIP_FEED_COOLDOWN", 600))
+FEED_CHANNELS_MAX = int(os.environ.get("RECLIP_FEED_CHANNELS_MAX", 30))
 # A pin does not exempt a file, it moves its deadline within a limit the admin
 # still owns. Otherwise the disk stops being bounded.
 PIN_RETENTION = int(os.environ.get("RECLIP_PIN_RETENTION", 30 * 24 * 3600))
@@ -310,6 +318,31 @@ def trim_history():
             conn.execute("DELETE FROM entries WHERE job_id = ?", (row["job_id"],))
 
 
+def stalest_channel():
+    with connect() as conn:
+        return conn.execute(
+            "SELECT owner, channel_url FROM subscriptions "
+            "WHERE refreshed_at < ? ORDER BY refreshed_at LIMIT 1",
+            (time.time() - FEED_TTL,)).fetchone()
+
+
+def feed_poller():
+    """One channel per tick, oldest first, for the whole instance.
+
+    This is the whole automatic refresh: no burst when someone opens the page,
+    and a ceiling on outbound lookups that does not move with the number of
+    users or channels.
+    """
+    while True:
+        time.sleep(FEED_POLL)
+        try:
+            row = stalest_channel()
+            if row:
+                refresh_subscription(row["owner"], row["channel_url"])
+        except Exception as e:
+            app.logger.warning("feed refresh failed: %s", e)
+
+
 def janitor():
     while True:
         try:
@@ -379,6 +412,17 @@ def run_download(job_id, url, format_choice, format_id, title, max_height=None):
                      error=f"Download timed out ({DOWNLOAD_TIMEOUT // 60} min limit)")
     except Exception as e:
         update_entry(job_id, status="error", error=str(e))
+
+
+# Held for the whole of a channel lookup, so two refreshes can never talk to
+# YouTube at the same time whoever asked for them.
+feed_lock = threading.Lock()
+last_channel_call = 0.0
+
+
+def channel_call_allowed():
+    """Space out lookups, whatever triggered them."""
+    return time.time() - last_channel_call >= FEED_POLL
 
 
 def get_settings(owner):
@@ -522,6 +566,7 @@ def fetch_channel(url, known=None, count=None):
 
 
 def refresh_subscription(owner, url, channel_id=None):
+    global last_channel_call
     known = {}
     if channel_id:
         with connect() as conn:
@@ -530,7 +575,9 @@ def refresh_subscription(owner, url, channel_id=None):
                                (owner, channel_id)).fetchone()
         if row:
             known = {v["id"]: v for v in json.loads(row["videos"]) if v.get("id")}
-    channel = fetch_channel(url, known, get_settings(owner)["videos"])
+    with feed_lock:
+        last_channel_call = time.time()
+        channel = fetch_channel(url, known, get_settings(owner)["videos"])
     with connect() as conn:
         conn.execute("INSERT INTO subscriptions "
                      "(owner, channel_id, channel_url, title, thumbnail, videos, refreshed_at) "
@@ -602,6 +649,11 @@ def subscribe():
     url = (request.json or {}).get("url", "").strip()
     if not is_safe_url(url) or not youtube_videos_url(url):
         return jsonify({"error": "Please enter a YouTube channel URL"}), 400
+    with connect() as conn:
+        followed = conn.execute("SELECT count(*) FROM subscriptions WHERE owner = ?",
+                                (owner,)).fetchone()[0]
+    if followed >= FEED_CHANNELS_MAX:
+        return jsonify({"error": f"At most {FEED_CHANNELS_MAX} channels"}), 400
     try:
         return jsonify(refresh_subscription(owner, url))
     except subprocess.TimeoutExpired:
@@ -621,11 +673,17 @@ def refresh_feed():
     owner = current_user()
     channel_id = (request.json or {}).get("channel_id")
     with connect() as conn:
-        row = conn.execute("SELECT channel_url FROM subscriptions "
+        row = conn.execute("SELECT channel_url, refreshed_at FROM subscriptions "
                            "WHERE owner = ? AND channel_id = ?",
                            (owner, channel_id)).fetchone()
     if row is None:
         return jsonify({"error": "Unknown channel"}), 404
+    # Clicking twice must not cost two lookups, and a page full of channels must
+    # not become a burst of them.
+    if time.time() - row["refreshed_at"] < FEED_COOLDOWN:
+        return jsonify({"ok": True, "skipped": "recent"})
+    if not channel_call_allowed():
+        return jsonify({"ok": True, "skipped": "busy"})
     try:
         refresh_subscription(owner, row["channel_url"], channel_id)
         return jsonify({"ok": True})
@@ -931,6 +989,11 @@ def download_file(job_id):
     if row is None or not row["path"] or not os.path.exists(row["path"]):
         return jsonify({"error": "File not ready"}), 404
     return send_file(row["path"], as_attachment=True, download_name=row["filename"])
+
+
+# Started last: the poller reaches for everything below it, and a thread that
+# outruns its own module is a bug waiting for a slow import.
+threading.Thread(target=feed_poller, daemon=True).start()
 
 
 if __name__ == "__main__":

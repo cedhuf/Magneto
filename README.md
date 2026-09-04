@@ -56,6 +56,16 @@ channel per request, so the wait is visible.
 Playing a feed video downloads it first, then plays the instance's own file.
 Nothing is embedded from YouTube.
 
+### Staying welcome at YouTube
+
+Every subscription of every user leaves from one IP, so the limits are
+instance-wide rather than per account. A background thread refreshes the single
+stalest channel every `RECLIP_FEED_POLL`, and only if its copy is older than
+`RECLIP_FEED_TTL`: the outbound rate is therefore capped no matter how many
+users or channels there are. A manual refresh obeys the same spacing and skips
+channels looked up less than `RECLIP_FEED_COOLDOWN` ago, reporting them as
+already fresh rather than as failures.
+
 ## Retention
 
 Files are temporary, the list is not. A file is deleted once it reaches
@@ -103,6 +113,10 @@ date rather than stored.
 | `RECLIP_DOWNLOAD_TIMEOUT` | `1200` | Seconds a single download may take before it is killed |
 | `RECLIP_PLAYLIST_MAX` | `50` | Most videos one pasted playlist may expand to |
 | `RECLIP_FEED_VIDEOS` | `5` | Ceiling for the per-user feed setting, not the setting itself |
+| `RECLIP_FEED_POLL` | `300` | Seconds between two channel lookups, for the whole instance |
+| `RECLIP_FEED_TTL` | `21600` | Age at which a cached channel is worth looking up again |
+| `RECLIP_FEED_COOLDOWN` | `600` | Minimum age before a manual refresh does anything |
+| `RECLIP_FEED_CHANNELS_MAX` | `30` | Channels one account may follow |
 | `RECLIP_PIN_RETENTION` | `2592000` | Seconds a pinned file is kept. A pin moves the deadline, it does not lift it, so the disk stays bounded |
 | `RECLIP_HISTORY_MAX` | `200` | Entries kept per user. Older ones are dropped, pinned ones never |
 | `RECLIP_DB` | `data/reclip.db` | SQLite file. Put it on the same volume as the downloads, not inside the downloads directory |

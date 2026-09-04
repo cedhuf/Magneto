@@ -124,7 +124,7 @@
       button.disabled = true;
       // One channel per request, so the wait is visible and no single call can
       // outlive the worker timeout.
-      let failed = 0;
+      let done = 0, skipped = 0, failed = 0;
       for (let i = 0; i < feedChannels.length; i++) {
         button.textContent = `Refreshing ${i + 1}/${feedChannels.length}…`;
         try {
@@ -133,11 +133,20 @@
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({channel_id: feedChannels[i].channel_id}),
           });
+          const data = await res.json();
           if (!res.ok) failed++;
+          else if (data.skipped) skipped++;
+          else done++;
         } catch (e) { failed++; }
       }
       await load();
-      message(failed ? `${failed} channel(s) could not be refreshed.` : 'Feed refreshed.', !!failed);
+      // Skipped is the normal case, not a failure: the server refuses to ask
+      // YouTube again about a channel it looked up a moment ago.
+      const parts = [];
+      if (done) parts.push(`${done} refreshed`);
+      if (skipped) parts.push(`${skipped} already fresh`);
+      if (failed) parts.push(`${failed} failed`);
+      message(parts.join(', ') || 'Nothing to refresh.', !!failed);
       button.disabled = false;
       button.textContent = 'Refresh feed';
     });
