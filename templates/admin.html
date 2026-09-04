@@ -12,8 +12,8 @@
     <div class="stats" id="stats"></div>
 
     <div class="controls admin-controls">
-      <button class="fetch-btn" id="sweepBtn" onclick="sweepNow()">Run the sweep now</button>
-      <span class="card-status" id="sweepMsg"></span>
+      <button class="fetch-btn danger" id="purgeBtn" onclick="purgeAll()">Delete everything</button>
+      <span class="card-status" id="purgeMsg"></span>
     </div>
 
     <div class="history">
@@ -81,15 +81,20 @@
         <tbody>${rows || '<tr><td colspan="7">Nothing yet.</td></tr>'}</tbody>`;
     }
 
-    async function sweepNow() {
-      const btn = document.getElementById('sweepBtn');
-      const msg = document.getElementById('sweepMsg');
+    async function purgeAll() {
+      // Everyone's entries and everyone's files, not only this account's.
+      if (!confirm('Delete every entry and every file, for every user?')) return;
+      const btn = document.getElementById('purgeBtn');
+      const msg = document.getElementById('purgeMsg');
       btn.disabled = true;
-      await fetch('/api/admin/sweep', { method: 'POST' });
+      const res = await fetch('/api/admin/purge', { method: 'POST' });
+      const d = await res.json();
       await load();
       btn.disabled = false;
-      msg.textContent = 'Swept.';
-      setTimeout(() => { msg.textContent = ''; }, 3000);
+      msg.textContent = res.ok
+        ? `${d.entries} entries and ${d.files} files gone, ${fmtSize(d.bytes) || '0 MB'} freed`
+          + (d.running ? `, ${d.running} still downloading` : '')
+        : 'Could not delete.';
     }
 
     async function removeEntry(jobId) {

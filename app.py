@@ -853,11 +853,30 @@ def admin_overview():
     })
 
 
-@app.route("/api/admin/sweep", methods=["POST"])
-def admin_sweep():
+@app.route("/api/admin/purge", methods=["POST"])
+def admin_purge():
+    """Empty the instance: every entry of every user, every file on disk.
+
+    A download in flight is left alone. Its row is what tells it where to write
+    and where to report, so removing it mid-way would leave a process writing a
+    file nobody claims.
+    """
     require_admin()
-    sweep_downloads()
-    return jsonify({"ok": True})
+    with connect() as conn:
+        running = {r["job_id"] for r in conn.execute(
+            "SELECT job_id FROM entries WHERE status = 'downloading'")}
+        entries = conn.execute(
+            "DELETE FROM entries WHERE status != 'downloading'").rowcount
+
+    files, freed = 0, 0
+    for path in glob.glob(os.path.join(DOWNLOAD_DIR, "*")):
+        if os.path.basename(path).split(".")[0] in running:
+            continue
+        freed += file_size(path)
+        remove_quietly(path)
+        files += 1
+    return jsonify({"entries": entries, "files": files, "bytes": freed,
+                    "running": len(running)})
 
 
 @app.route("/api/admin/entries/<job_id>", methods=["DELETE"])

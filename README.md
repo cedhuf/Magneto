@@ -144,9 +144,10 @@ date rather than stored.
 ### Admin
 
 `/admin` shows what the instance holds: space taken, space left, entries and
-size per user, and every entry with its age and remaining time. It can run the
-sweep early and delete a file with its entry. Nothing is configured there,
-settings are environment variables.
+size per user, and every entry with its age and remaining time. It deletes one
+entry with its file, or empties the instance outright with **Delete everything**
+(every user's entries and every file, downloads in flight excepted). Nothing is
+configured there, settings are environment variables.
 
 Admin is membership of `RECLIP_ADMIN_GROUP` in `Remote-Groups`. With
 `RECLIP_AUTH=none` the single user is admin, since there is nobody else.

@@ -316,6 +316,14 @@ textarea::placeholder { color: var(--muted); }
 .fetch-btn:hover { background: var(--accent-hover); }
 .fetch-btn:active { transform: scale(0.98); }
 .fetch-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+/* Destructive, so it must not wear the colour of the primary action: outlined
+   until the pointer is on it. */
+.fetch-btn.danger {
+  background: var(--error-wash);
+  border: 1.5px solid var(--error-border);
+  color: var(--error);
+}
+.fetch-btn.danger:hover { background: var(--error-wash-strong); border-color: var(--error); }
 
 /* Cards */
 .cards { margin-top: 24px; }
