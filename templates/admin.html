@@ -12,7 +12,10 @@
     <div class="stats" id="stats"></div>
 
     <div class="controls admin-controls">
-      <button class="fetch-btn danger del-btn" id="purgeBtn" data-confirm="Confirm: delete everything"
+      <!-- Sized for its longest label, so arming it does not move the page.
+           Everything is set in one monospace face, so that is a character count. -->
+      <button class="fetch-btn danger del-btn" id="purgeBtn" data-confirm="Confirm"
+        style="min-width: calc(17ch + 0.68em)"
         onclick="if (armDelete(this)) { purgeAll() }">Delete everything</button>
       <span class="card-status" id="purgeMsg"></span>
     </div>
@@ -74,10 +77,7 @@
             <td>${d.shorts.entries} kept ${fmtSpan(d.shorts.retention)}</td>
             <td class="num">${d.shorts.bytes ? esc(fmtSize(d.shorts.bytes)) : '—'}</td>
             <td class="num">—</td><td class="num">—</td>
-            <td>${d.shorts.entries
-              ? `<button class="row-btn del-btn" data-confirm="Confirm"
-                  onclick="if (armDelete(this)) { clearShorts() }">Purge</button>`
-              : ''}</td>
+            <td>${d.shorts.entries ? deleteButton('clearShorts()', {label: 'Purge'}) : ''}</td>
           </tr>`
         : '';
 

@@ -14,6 +14,7 @@ const ICONS = {
   music: {fill: false, paths: ['M3 17a3 3 0 1 0 6 0a3 3 0 0 0 -6 0', 'M13 17a3 3 0 1 0 6 0a3 3 0 0 0 -6 0', 'M9 17v-13h10v13', 'M9 8h10']},
   error: {fill: false, paths: ['M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0', 'M10 10l4 4m0 -4l-4 4']},
   refresh: {fill: false, paths: ['M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4', 'M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4']},
+  check: {fill: false, paths: ['M5 12l5 5l10 -10']},
   up: {fill: false, paths: ['M6 15l6 -6l6 6']},
   down: {fill: false, paths: ['M6 9l6 6l6 -6']},
 };
