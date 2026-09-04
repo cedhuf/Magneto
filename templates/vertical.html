@@ -38,6 +38,7 @@
                   title="Previous (up arrow)" aria-label="Previous"></button>
           <button class="round-btn" id="nextBtn" onclick="step(1)"
                   title="Next (down arrow)" aria-label="Next"></button>
+          <span class="round-slot" id="shareSlot"></span>
           <span class="round-slot" id="removeSlot"></span>
         </div>
         <div class="shorts-caption">
@@ -72,6 +73,7 @@
     let accounts = [];
     let at = 0;
     let quality = 720;
+    let sharing = false;
 
     function message(text, error = false) {
       const el = document.getElementById('message');
@@ -87,6 +89,7 @@
       clips = data.clips;
       accounts = data.accounts || [];
       quality = data.quality;
+      sharing = data.share;
       at = Math.min(at, Math.max(0, clips.length - 1));
       document.getElementById('prevBtn').innerHTML = icon('up');
       document.getElementById('nextBtn').innerHTML = icon('down');
@@ -155,6 +158,11 @@
       document.getElementById('removeSlot').innerHTML = clip.job_id
         ? deleteButton('removeClip()', {icon: true, label: 'Delete'})
         : '';
+      document.getElementById('shareSlot').innerHTML = sharing && clip.job_id
+        ? `<button class="round-btn${clip.shared ? ' on' : ''}" onclick="shareClip()"
+             title="${clip.shared ? 'Copy the link again' : 'Share'}"
+             aria-label="Share">${icon(clip.shared ? 'link' : 'share')}</button>`
+        : '';
       if (mounted !== at && mounted >= 0 && slides[mounted])
         slides[mounted].innerHTML = poster(clips[mounted]);
       if (clip.job_id) {
@@ -216,6 +224,36 @@
       message('');
       reel.scrollTo({top: next * reel.clientHeight, behavior: 'smooth'});
       show();
+    }
+
+    /* A link, not a file: the phone's own share sheet where there is one, the
+       clipboard otherwise. Revoking is offered on the spot because that is the
+       only moment anyone thinks about it. */
+    async function shareClip() {
+      const clip = clips[at];
+      if (!clip || !clip.job_id) return;
+      try {
+        const res = await fetch(`/api/share/${clip.job_id}`, {method: 'POST'});
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not share');
+        const url = new URL(data.url, location.origin).href;
+        clip.shared = true;
+        show();
+        const hours = Math.round(data.expires_in / 3600);
+        if (navigator.share) await navigator.share({title: clip.title, url});
+        else await navigator.clipboard.writeText(url);
+        message(`Link ${navigator.share ? 'shared' : 'copied'}, readable for ${hours} h.`);
+        document.getElementById('message').innerHTML +=
+          ` <button class="link-btn" onclick="unshareClip()">Revoke</button>`;
+      } catch (err) { message(friendlyError(err.message), true); }
+    }
+
+    async function unshareClip() {
+      const clip = clips[at];
+      await fetch(`/api/share/${clip.job_id}`, {method: 'DELETE'});
+      clip.shared = false;
+      show();
+      message('Link revoked.');
     }
 
     async function removeClip() {

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+{# A shared link is read by someone who has no account here, so the page holds
+   the video and nothing else: no navigation, no identity, no way in. #}
+<head>
+  {% set page_title = title or "ReClip" %}
+  {% include "_head.html" %}
+  <meta name="robots" content="noindex, nofollow">
+</head>
+<body>
+  <div class="page shared">
+    <div class="shared-frame">
+      <video class="shared-video" src="/s/{{ token }}/stream" controls autoplay playsinline></video>
+      <div class="shared-caption">
+        <div class="shared-title">{{ title or "Untitled" }}</div>
+        {% if uploader %}<div class="shared-meta">{{ uploader }}</div>{% endif %}
+      </div>
+    </div>
+    <p class="shared-note">Shared from a private ReClip instance. The link expires.</p>
+  </div>
+  <script src="/static/theme.js"></script>
+</body>
+</html>

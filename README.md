@@ -151,6 +151,56 @@ own: the proxy has already done that work.
 > the proxy's IP at the firewall. Same guarantee, but resting on a rule someone
 > can remove by accident rather than on something structural.
 
+## Sharing
+
+Off by default. With `RECLIP_SHARE=1`, a downloaded clip gets a share button
+that mints a link like `/s/hCq2R...`, hands it to the phone's share sheet where
+there is one and to the clipboard otherwise. Anyone holding the link can watch
+the video, with no account and no sign-in.
+
+That only works if the reverse proxy stops asking for authentication on that
+one prefix. In Caddy, with tinyauth in front of everything else:
+
+```
+reclip.example.com {
+    handle /s/* {
+        reverse_proxy 127.0.0.1:8899
+    }
+    handle {
+        forward_auth 127.0.0.1:8080 {
+            uri /api/auth/caddy
+            copy_headers Remote-User Remote-Groups
+        }
+        reverse_proxy 127.0.0.1:8899
+    }
+}
+```
+
+Order matters: the `/s/*` block must come first, and it must not carry the
+`forward_auth` directive. Nothing else changes.
+
+**This one rule is the security boundary.** Widen it and the instance is open;
+forget it and every share link lands on a sign-in page. The application does
+its part: `/s/` routes take a token and never a job id or a user, an unknown
+token is a flat 404 whether it expired or never existed, the page carries no
+navigation and no identity, and it is served `noindex, nofollow`.
+
+The guard rails, in the order they matter:
+
+- The link can be forwarded. A share is public for as long as it lives, so
+  `RECLIP_SHARE_TTL` is the real control, not a formality.
+- Tokens are 128 bits from `secrets`, so they are not guessable and not
+  enumerable.
+- Sharing again returns the same live link rather than minting a second one,
+  because two links to a file are two things to revoke.
+- Revoke is offered on the spot, which is the only moment anybody thinks about
+  it. Deleting the entry kills the link too.
+- `RECLIP_SHARE_MAX` bounds how many links one account can have out at once.
+
+A share also holds its file: a shared short would otherwise be swept an hour
+later and hand out a dead link. The file's deadline becomes the later of its
+own and the link's, and falls back the moment the link is revoked or expires.
+
 ## Configuration
 
 Everything is an environment variable, so a compose file is the whole
@@ -169,6 +219,9 @@ date rather than stored.
 | `RECLIP_FEED` | `0` | The feed page, and with it the only thread that asks YouTube anything on its own. Off unless asked for |
 | `RECLIP_SHORTS` | `0` | The shorts page. Shorts come from the channels followed on the feed, so this does nothing while `RECLIP_FEED` is off |
 | `RECLIP_TIKTOK` | `0` | The TikTok page: its own accounts, its own tab, the same player as the shorts page. Independent of `RECLIP_FEED` and `RECLIP_SHORTS` |
+| `RECLIP_SHARE` | `0` | Public share links. Off unless asked for, and it does nothing until the reverse proxy stops asking for authentication on `/s/` |
+| `RECLIP_SHARE_TTL` | `172800` | Seconds a share link works. The link is the whole credential and can be forwarded, so this is the real limit on who ends up watching |
+| `RECLIP_SHARE_MAX` | `10` | Live links one account may hold at a time. Expired ones do not count |
 | `RECLIP_SHORTS_RETENTION` | `3600` | Seconds a watched short is kept. It is fetched to be watched once, so it does not need the deadline a download gets, and it is never pinned |
 | `RECLIP_FEED_VIDEOS` | `5` | Ceiling for the per-user feed setting, not the setting itself |
 | `RECLIP_FEED_POLL` | `300` | Seconds between two channel lookups, for the whole instance |

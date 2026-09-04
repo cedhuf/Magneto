@@ -1103,6 +1103,8 @@ audio.modal-media {
 .shorts-rail .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
 .round-btn:active:not(:disabled) { transform: scale(0.94); }
 .round-btn:disabled { opacity: 0.35; cursor: default; }
+/* A live link is a state of the clip, not of the pointer. */
+.round-btn.on { border-color: var(--accent); color: var(--accent); }
 /* Round like its neighbours, red like itself. */
 .shorts-rail .del-btn.armed,
 .shorts-rail .del-btn.armed:hover {
@@ -1318,4 +1320,46 @@ audio.modal-media {
 .thumb-badge.ready {
   background: var(--accent);
   color: var(--on-accent);
+}
+
+
+/* A shared link: one video, its name, and nothing that leads anywhere. The
+   frame is bounded by the window's height whatever the video's shape, so a
+   phone held upright and a laptop both show the whole of it. */
+.page.shared {
+  max-width: 900px;
+  padding: 32px 24px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+.shared-frame { width: 100%; }
+.shared-video {
+  display: block;
+  width: 100%;
+  max-height: 78dvh;
+  border-radius: var(--radius);
+  background: var(--video-bg);
+  object-fit: contain;
+}
+.shared-caption { margin-top: 14px; text-align: center; }
+.shared-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: 1.3rem;
+  line-height: 1.3;
+  color: var(--fg);
+}
+.shared-meta {
+  margin-top: 4px;
+  font-size: 0.68rem;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.shared-note {
+  font-size: 0.66rem;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }

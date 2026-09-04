@@ -7,11 +7,13 @@ import uuid
 import glob
 import json
 import shutil
+import secrets
 import sqlite3
 import subprocess
 import threading
 from urllib.parse import urlparse, urlunparse
-from flask import Flask, request, jsonify, send_file, render_template, abort
+from flask import (Flask, request, jsonify, send_file, render_template, abort,
+                   make_response)
 
 app = Flask(__name__)
 DOWNLOAD_DIR = os.path.join(os.path.dirname(__file__), "downloads")
@@ -59,6 +61,13 @@ SHORTS_RETENTION = int(os.environ.get("RECLIP_SHORTS_RETENTION", 3600))
 # TikTok has its own page, its own accounts and its own switch: it shares the
 # player and the outbound budget with the shorts page, nothing else.
 TIKTOK_ENABLED = enabled("RECLIP_TIKTOK")
+# A share hands a file to whoever holds the link, so it is off unless an
+# instance asks for it, and it only means anything once the reverse proxy
+# excludes /s/ from its forward auth. The link is the whole credential: it can
+# be forwarded, so the expiry is the real setting, not a formality.
+SHARE_ENABLED = enabled("RECLIP_SHARE")
+SHARE_TTL = int(os.environ.get("RECLIP_SHARE_TTL", 48 * 3600))
+SHARE_MAX = int(os.environ.get("RECLIP_SHARE_MAX", 10))
 # A pin does not exempt a file, it moves its deadline within a limit the admin
 # still owns. Otherwise the disk stops being bounded.
 PIN_RETENTION = int(os.environ.get("RECLIP_PIN_RETENTION", 30 * 24 * 3600))
@@ -193,6 +202,16 @@ MIGRATIONS = [
     """
     ALTER TABLE channels ADD COLUMN platform TEXT NOT NULL DEFAULT 'youtube';
     """,
+    """
+    CREATE TABLE shares (
+        token      TEXT PRIMARY KEY,
+        job_id     TEXT NOT NULL,
+        owner      TEXT NOT NULL,
+        created_at REAL NOT NULL,
+        expires_at REAL NOT NULL
+    );
+    CREATE INDEX shares_job ON shares (job_id);
+    """,
 ]
 
 
@@ -304,12 +323,35 @@ def update_entry(job_id, **fields):
                      (*fields.values(), job_id))
 
 
-def retention_for(row):
+def live_shares():
+    """job_id -> the last moment a link to it is still meant to work."""
+    if not SHARE_ENABLED:
+        return {}
+    with connect() as conn:
+        return {r["job_id"]: r["until"] for r in conn.execute(
+            "SELECT job_id, max(expires_at) AS until FROM shares "
+            "WHERE expires_at > ? GROUP BY job_id", (time.time(),))}
+
+
+def retention_for(row, shares=None):
     """A short is watched once, in the minutes after it is fetched, and never
-    pinned: it has its own, much shorter deadline."""
+    pinned: it has its own, much shorter deadline.
+
+    A file someone has shared outlives all of that until the link does. A short
+    lasts an hour, so without this a link handed out at noon would be dead by
+    one, which is worse than not being able to share at all.
+    """
     if row["kind"] == "short":
-        return SHORTS_RETENTION
-    return PIN_RETENTION if row["pinned"] else RETENTION
+        ttl = SHORTS_RETENTION
+    else:
+        ttl = PIN_RETENTION if row["pinned"] else RETENTION
+    until = (shares if shares is not None else live_shares()).get(row["job_id"])
+    if until and row["path"]:
+        try:
+            ttl = max(ttl, until - os.path.getmtime(row["path"]))
+        except OSError:
+            pass
+    return ttl
 
 
 def seconds_left(row):
@@ -407,9 +449,10 @@ def sweep_downloads():
         # by path and the most generous reference wins: nobody's pin may be
         # undone by somebody else's expiry.
         deadlines = {}
+        shares = live_shares()
         for row in conn.execute(
-                "SELECT path, pinned, kind FROM entries WHERE path IS NOT NULL"):
-            ttl = retention_for(row)
+                "SELECT job_id, path, pinned, kind FROM entries WHERE path IS NOT NULL"):
+            ttl = retention_for(row, shares)
             deadlines[row["path"]] = max(deadlines.get(row["path"], 0), ttl)
         # A download in flight has no path yet, and is recognised by its name.
         running = {r["job_id"] for r in
@@ -887,7 +930,8 @@ def page_context():
     so asking for it from the browser only bought a flash of empty header."""
     return {"auth": AUTH_MODE, "user": current_user(),
             "admin": is_admin(), "logout_url": LOGOUT_URL,
-            "feed": FEED_ENABLED, "shorts": SHORTS_ENABLED, "tiktok": TIKTOK_ENABLED}
+            "feed": FEED_ENABLED, "shorts": SHORTS_ENABLED, "tiktok": TIKTOK_ENABLED,
+            "share": SHARE_ENABLED}
 
 
 @app.before_request
@@ -900,6 +944,8 @@ def gate_optional_pages():
     if not SHORTS_ENABLED and (path == "/shorts" or path.startswith("/api/shorts")):
         abort(404)
     if not TIKTOK_ENABLED and (path == "/tiktok" or path.startswith("/api/tiktok")):
+        abort(404)
+    if not SHARE_ENABLED and (path.startswith("/s/") or path.startswith("/api/share")):
         abort(404)
     # Removing and refreshing a followed account is the same route whichever
     # page follows it, so it opens as soon as one of them is on.
@@ -1014,18 +1060,21 @@ def upright_clips(owner, platform, with_accounts=False):
             "SELECT url, job_id, path FROM entries WHERE variant = ? AND status = 'done' "
             "AND path IS NOT NULL", (variant,)) if os.path.exists(r["path"])}
 
+    shared = set(live_shares())
     lists = []
     for row in rows:
         clips = json.loads(row["shorts"])[:settings["videos"]]
         lists.append([{**clip, "uploader": row["title"], "platform": row["platform"],
-                       "job_id": ready.get(clip["url"])} for clip in clips])
+                       "job_id": ready.get(clip["url"]),
+                       "shared": ready.get(clip["url"]) in shared} for clip in clips])
 
     interleaved = []
     for rank in range(max((len(one) for one in lists), default=0)):
         for one in lists:
             if rank < len(one):
                 interleaved.append(one[rank])
-    payload = {"clips": interleaved, "quality": settings["quality"]}
+    payload = {"clips": interleaved, "quality": settings["quality"],
+               "share": SHARE_ENABLED}
     if with_accounts:
         payload["accounts"] = [{"channel_id": r["channel_id"], "title": r["title"]}
                                for r in rows]
@@ -1587,6 +1636,82 @@ def stream_file(job_id):
     # Inline rather than an attachment, and conditional so the browser can seek
     # with Range requests instead of pulling the whole file first.
     return send_file(row["path"], conditional=True)
+
+
+# Sharing: a token is the whole credential, so it names its own file and never
+# takes a job id or a user from the caller. Nothing under /s/ asks who is
+# reading, which is the point, and nothing under it leads anywhere else.
+def shared_entry(token):
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT e.* FROM shares s JOIN entries e ON e.job_id = s.job_id "
+            "WHERE s.token = ? AND s.expires_at > ?",
+            (token, time.time())).fetchone()
+    if row is None or not row["path"] or not os.path.exists(row["path"]):
+        return None
+    return row
+
+
+def unindexed(response):
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
+
+@app.route("/s/<token>")
+def shared_page(token):
+    row = shared_entry(token)
+    if row is None:
+        abort(404)
+    return unindexed(make_response(render_template(
+        "shared.html", token=token, title=row["title"], uploader=row["uploader"],
+        kind=row["kind"])))
+
+
+@app.route("/s/<token>/stream")
+def shared_stream(token):
+    row = shared_entry(token)
+    if row is None:
+        abort(404)
+    # Conditional, so a phone can seek instead of pulling the whole file.
+    return unindexed(make_response(send_file(row["path"], conditional=True)))
+
+
+@app.route("/api/share/<job_id>", methods=["POST"])
+def create_share(job_id):
+    """Reuses the live link rather than minting a second one: two links to the
+    same file are two things to revoke and one more chance to miss one."""
+    owner = current_user()
+    row = get_entry(job_id, owner)
+    if row is None or not row["path"] or not os.path.exists(row["path"]):
+        return jsonify({"error": "File not ready"}), 404
+    now = time.time()
+    with connect() as conn:
+        conn.execute("DELETE FROM shares WHERE expires_at <= ?", (now,))
+        live = conn.execute(
+            "SELECT token, expires_at FROM shares WHERE job_id = ? AND owner = ?",
+            (job_id, owner)).fetchone()
+        if live:
+            return jsonify({"url": f"/s/{live['token']}",
+                            "expires_in": int(live["expires_at"] - now)})
+        held = conn.execute("SELECT count(*) FROM shares WHERE owner = ?",
+                            (owner,)).fetchone()[0]
+        if held >= SHARE_MAX:
+            return jsonify({"error": f"At most {SHARE_MAX} links at a time"}), 400
+        token = secrets.token_urlsafe(16)
+        conn.execute("INSERT INTO shares (token, job_id, owner, created_at, expires_at) "
+                     "VALUES (?, ?, ?, ?, ?)", (token, job_id, owner, now, now + SHARE_TTL))
+    return jsonify({"url": f"/s/{token}", "expires_in": SHARE_TTL})
+
+
+@app.route("/api/share/<job_id>", methods=["DELETE"])
+def revoke_share(job_id):
+    """The file goes back to its own deadline, and may be swept within the hour
+    if it was a short."""
+    owner = current_user()
+    with connect() as conn:
+        conn.execute("DELETE FROM shares WHERE job_id = ? AND owner = ?", (job_id, owner))
+    return jsonify({"ok": True})
 
 
 @app.route("/api/file/<job_id>")
