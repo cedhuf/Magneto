@@ -164,6 +164,10 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* The browser hides [hidden] with display: none, which any author display rule
+   beats. Two panels declared display: flex and could never be hidden again. */
+[hidden] { display: none !important; }
+
 body {
   font-family: 'DM Mono', monospace;
   background: var(--bg);
