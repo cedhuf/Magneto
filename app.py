@@ -370,7 +370,8 @@ def run_download(job_id, url, format_choice, format_id, title, max_height=None):
     elif max_height:
         # The feed asks for a height rather than a format id: it never looked
         # the video up, so it has no ids to choose from.
-        cmd += ["-f", f"bestvideo[height<={max_height}]+bestaudio[ext=m4a]/"
+        cmd += ["-f", f"bestvideo[height<={max_height}][vcodec^=avc1]+bestaudio[ext=m4a]/"
+                      f"bestvideo[height<={max_height}]+bestaudio[ext=m4a]/"
                       f"bestvideo[height<={max_height}]+bestaudio/"
                       f"best[height<={max_height}]/best",
                 "--merge-output-format", "mp4"]
@@ -847,13 +848,17 @@ def get_info():
         if info.get("live_status") in ("is_live", "is_upcoming"):
             return jsonify({"error": "This is a live stream, not a finished video"}), 400
 
-        # Build quality options, keeping the best format per resolution
+        # One format per resolution. H.264 first, then bitrate: YouTube stops
+        # publishing H.264 above 1080p, and VP9 or AV1 in an mp4 plays in a
+        # browser but not in QuickTime, on an iPhone or on most televisions.
+        def rank(f):
+            return (f.get("vcodec", "").startswith("avc1"), f.get("tbr") or 0)
+
         best_by_height = {}
         for f in info.get("formats", []):
             height = f.get("height")
             if height and f.get("vcodec", "none") != "none":
-                tbr = f.get("tbr") or 0
-                if height not in best_by_height or tbr > (best_by_height[height].get("tbr") or 0):
+                if height not in best_by_height or rank(f) > rank(best_by_height[height]):
                     best_by_height[height] = f
 
         formats = []
@@ -865,6 +870,7 @@ def get_info():
                 # Video stream only, and often an estimate. It is an order of
                 # magnitude, not an accounting figure.
                 "size": f.get("filesize") or f.get("filesize_approx"),
+                "compatible": f.get("vcodec", "").startswith("avc1"),
             })
         formats.sort(key=lambda x: x["height"], reverse=True)
 

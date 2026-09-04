@@ -68,11 +68,11 @@
       return [...new Set(text.split(/[\s,]+/).map(u => u.trim()).filter(u => u.startsWith('http')))];
     }
 
-    /* Three qualities by default, the best three at or below 1440p: 4K costs a
-       lot and shows little on the screens this ends up on. Everything else,
-       4K included, is one click away behind the +N chip. */
+    /* The three offered by default all play everywhere. YouTube publishes no
+       H.264 above 1080p, and VP9 or AV1 in an mp4 plays in a browser but not in
+       QuickTime or on an iPhone, so those sit behind the +N chip, marked. */
     function splitFormats(formats, selectedId) {
-      const pool = formats.filter(f => f.height <= 1440);
+      const pool = formats.filter(f => f.compatible);
       const visible = (pool.length ? pool : formats).slice(0, 3);
       const picked = formats.find(f => f.id === selectedId);
       // A niche choice stays on screen, or the selection becomes invisible.
@@ -280,7 +280,10 @@
         const split = splitFormats(c.formats, c.selectedFormatId);
         const shown = c.showAllFormats ? c.formats : split.visible;
         qualityChips = shown.map(f =>
-          `<button class="q-chip${f.id === c.selectedFormatId ? ' active' : ''}" onclick="pickFormat(${idx}, '${f.id}')">${f.label}${
+          `<button class="q-chip${f.id === c.selectedFormatId ? ' active' : ''}${f.compatible ? '' : ' q-odd'}"
+            onclick="pickFormat(${idx}, '${f.id}')"
+            title="${f.compatible ? '' : 'VP9 or AV1: plays in a browser, not in QuickTime or on an iPhone'}"
+            >${f.label}${f.compatible ? '' : '<span class="q-warn">!</span>'}${
             f.size ? `<span class="q-size">${fmtSize(f.size)}</span>` : ''}</button>`
         ).join('');
         if (!c.showAllFormats && split.hidden.length) {

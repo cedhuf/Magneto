@@ -983,3 +983,11 @@ audio.modal-media {
   text-transform: uppercase;
 }
 .feed-settings .pill { padding: 6px 12px; font-size: 0.7rem; }
+
+/* A resolution that will not play on an Apple device is available, not hidden,
+   but it says so. */
+.q-warn {
+  margin-left: 4px;
+  color: var(--error);
+  font-weight: 500;
+}

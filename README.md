@@ -13,7 +13,7 @@ https://github.com/user-attachments/assets/419d3e50-c933-444b-8cab-a9724986ba05
 
 - Download videos from 1000+ supported sites (via [yt-dlp](https://github.com/yt-dlp/yt-dlp))
 - MP4 video or MP3 audio extraction
-- Quality/resolution picker
+- Quality/resolution picker, defaulting to a format that plays everywhere
 - Bulk downloads — paste multiple URLs at once
 - Automatic URL deduplication
 - A personal YouTube feed — follow channels and browse their five latest videos
@@ -65,6 +65,14 @@ stalest channel every `RECLIP_FEED_POLL`, and only if its copy is older than
 users or channels there are. A manual refresh obeys the same spacing and skips
 channels looked up less than `RECLIP_FEED_COOLDOWN` ago, reporting them as
 already fresh rather than as failures.
+
+## Quality and compatibility
+
+YouTube publishes no H.264 above 1080p: 1440p and 2160p exist only as VP9 or
+AV1, which play in a browser but not in QuickTime, on an iPhone or on most
+televisions. So the three resolutions offered by default are the best three
+that play everywhere, and the higher ones sit behind the `+N` chip marked with
+a warning. Picking one is a choice, not a trap.
 
 ## Retention
 
