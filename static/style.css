@@ -987,18 +987,38 @@ audio.modal-media {
 }
 .footer-note a:hover { border-bottom-color: var(--accent); }
 
-/* Shorts: one at a time, in the shape they were filmed in. The page holds a
-   single frame rather than a list, so nothing here is a card. */
-.shorts { display: flex; flex-direction: column; align-items: center; margin-top: 28px; }
+/* Shorts and TikTok: one at a time, in the shape they were filmed in. The page
+   holds a single frame rather than a list, so nothing here is a card.
+
+   An upright video is limited by the bottom of the screen, never by the side,
+   so the frame is measured from the window's height and its width follows.
+   That single number is --stage: the height the video may take once the
+   header, the caption and the page's own margins have had theirs. */
+.shorts {
+  --chrome: 250px;
+  --stage: clamp(360px, calc(100dvh - var(--chrome)), 900px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+/* The pages that manage their own accounts carry one more bar above the frame. */
+.shorts.manage { --chrome: 320px; }
+/* These two pages hold one thing, so they give it the room the other pages
+   spend on the space around their lists. */
+.page:has(.shorts) { padding: 28px 24px 32px; }
+.page:has(.shorts) .brand { margin-bottom: 18px; }
 .shorts-frame {
   display: grid;
-  grid-template-columns: minmax(0, 340px) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas: "media rail" "caption caption";
   gap: 12px;
-  width: 100%;
-  max-width: 420px;
+  /* 44 for the rail, 12 for the gap: the frame is the video plus its controls. */
+  width: min(100%, calc(var(--stage) * 9 / 16 + 56px));
 }
 .shorts-media { grid-area: media; }
+/* Every clip gets the same rectangle, whatever it was filmed in. A clip that is
+   not upright is shown whole against the frame rather than cropped into it:
+   letterboxing reads as the video's shape, a crop reads as a bug. */
 .shorts-video,
 .shorts-poster {
   display: block;
@@ -1006,7 +1026,7 @@ audio.modal-media {
   aspect-ratio: 9 / 16;
   border-radius: var(--radius);
   background: var(--video-bg);
-  object-fit: cover;
+  object-fit: contain;
 }
 .shorts-poster { position: relative; overflow: hidden; }
 .shorts-poster img { width: 100%; height: 100%; object-fit: cover; opacity: 0.45; }
@@ -1080,7 +1100,7 @@ audio.modal-media {
 /* Cut into the page rather than laid on it: the page's own background, an inner
    shadow for the depth and a hairline below for the lit edge. */
 .engraved {
-  max-width: 420px;
+  width: min(100%, 420px);
   margin-top: 8px;
   padding: 44px 30px;
   border: 1.5px solid var(--card-border);
