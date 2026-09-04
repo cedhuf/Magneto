@@ -20,7 +20,7 @@
     </div>
     <div class="feed-panel feed-add-panel" id="addPanel" hidden>
       <form class="feed-add" id="addForm">
-        <input id="channelUrl" type="url" required
+        <input id="followUrl" type="url" required
           placeholder="Paste a {% if tiktok %}YouTube channel or TikTok account{% else %}YouTube channel{% endif %} URL…">
         <button class="fetch-btn" id="addSubmit">Add</button>
       </form>
@@ -51,7 +51,10 @@
   <script src="/static/card.js"></script>
   <script src="/static/delete.js"></script>
   <script src="/static/actions.js"></script>
+  <script src="/static/jobs.js"></script>
+  <script src="/static/follow.js"></script>
   <script>
+    const FOLLOWED = {noun: 'Channel', add: '/api/feed/subscriptions'};
     let feedVideos = [];
     let feedChannels = [];
     let feedSettings = {videos: 3, quality: 720};
@@ -100,14 +103,7 @@
       document.getElementById('settingsBtn').hidden = empty;
       document.getElementById('refreshBtn').hidden = empty;
       if (empty) document.getElementById('addPanel').hidden = false;
-      const list = document.getElementById('channelList');
-      list.innerHTML = data.channels.map(c => `<div class="channel-row">
-        <span>${esc(c.title)}</span>
-        <span class="channel-actions">
-          <button class="row-btn" onclick="refreshChannel('${esc(c.channel_id)}', this)">Refresh</button>
-          ${deleteButton(`removeChannel('${esc(c.channel_id)}')`, {label: 'Remove'})}
-        </span>
-      </div>`).join('');
+      document.getElementById('channelList').innerHTML = followRows(data.channels);
       document.getElementById('subscriptions').hidden = !data.channels.length;
     }
 
@@ -156,18 +152,7 @@
     document.getElementById('settingsBtn').addEventListener('click', () => togglePanel('settings'));
     document.getElementById('addBtn').addEventListener('click', () => togglePanel('addPanel'));
 
-    document.getElementById('addForm').addEventListener('submit', async e => {
-      e.preventDefault();
-      const button = document.getElementById('addSubmit');
-      button.disabled = true; button.textContent = 'Adding…'; message('Looking up channel…');
-      try {
-        const res = await fetch('/api/feed/subscriptions', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url: document.getElementById('channelUrl').value})});
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Could not add channel');
-        document.getElementById('channelUrl').value = ''; message('Channel added.'); await load();
-      } catch (err) { message(friendlyError(err.message), true); }
-      button.disabled = false; button.textContent = 'Add';
-    });
+    wireFollowForm();
 
     /* An import follows nobody's channels at once and looks none of them up:
        the poller fills them one at a time, which is the whole point. */
@@ -246,19 +231,6 @@
       return data.job_id;
     }
 
-    function waitForFile(jobId) {
-      return new Promise((resolve, reject) => {
-        const poll = setInterval(async () => {
-          try {
-            const res = await fetch(`/api/status/${jobId}`);
-            const data = await res.json();
-            if (data.status === 'done') { clearInterval(poll); resolve(data); }
-            else if (data.status === 'error') { clearInterval(poll); reject(new Error(data.error)); }
-          } catch (e) { clearInterval(poll); reject(e); }
-        }, 1000);
-      });
-    }
-
     /* Progress belongs on the card, as on the home page: the modal opens once
        there is something to play. */
     async function prepare(index, label) {
@@ -310,30 +282,6 @@
       await load();
     }
 
-    async function removeChannel(id) {
-      await fetch(`/api/feed/subscriptions/${encodeURIComponent(id)}`, {method: 'DELETE'}); load();
-    }
-
-    /* Refreshing one channel on purpose skips the spacing that Refresh feed
-       obeys: the user knows a video is out, and asking about every channel to
-       reach that one is what made the button useless. */
-    async function refreshChannel(id, button) {
-      button.disabled = true; button.textContent = 'Refreshing…';
-      try {
-        const res = await fetch('/api/feed/refresh', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({channel_id: id, force: true}),
-        });
-        const d = await res.json();
-        if (!res.ok) throw new Error(d.error || 'Could not refresh');
-        await load();
-        message('Channel refreshed.');
-      } catch (err) {
-        message(friendlyError(err.message), true);
-        button.disabled = false; button.textContent = 'Refresh';
-      }
-    }
     initLayoutToggle(['videos'], 'layout.feed', 'grid');
     load();
   </script>

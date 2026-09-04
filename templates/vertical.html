@@ -20,13 +20,13 @@
     </div>
     <div class="feed-panel feed-add-panel" id="addPanel" hidden>
       <form class="feed-add" id="addForm">
-        <input id="accountUrl" type="url" placeholder="Paste a TikTok account URL…" required>
+        <input id="followUrl" type="url" placeholder="Paste a TikTok account URL…" required>
         <button class="fetch-btn" id="addSubmit">Add</button>
       </form>
     </div>
     {% endif %}
 
-    <div class="shorts" id="stage">
+    <div class="shorts{{ ' manage' if manage }}" id="stage">
       <div class="shorts-frame" id="frame" hidden>
         <div class="shorts-media" id="media"></div>
         <div class="shorts-rail">
@@ -59,7 +59,10 @@
   <script src="/static/icons.js"></script>
   <script src="/static/format.js"></script>
   <script src="/static/delete.js"></script>
+  <script src="/static/jobs.js"></script>
+  <script src="/static/follow.js"></script>
   <script>
+    const FOLLOWED = {noun: 'Account', add: '/api/tiktok/accounts'};
     const SOURCE = {{ source | tojson }};
     const MANAGE = {{ manage | tojson }};
     let clips = [];
@@ -146,19 +149,6 @@
       clip.fetching = false;
     }
 
-    function waitForFile(jobId) {
-      return new Promise((resolve, reject) => {
-        const poll = setInterval(async () => {
-          try {
-            const res = await fetch(`/api/status/${jobId}`);
-            const data = await res.json();
-            if (data.status === 'done') { clearInterval(poll); resolve(data); }
-            else if (data.status === 'error') { clearInterval(poll); reject(new Error(data.error)); }
-          } catch (e) { clearInterval(poll); reject(e); }
-        }, 1000);
-      });
-    }
-
     function step(by) {
       const next = at + by;
       if (next < 0 || next >= clips.length) return;
@@ -211,14 +201,7 @@
         : 'No accounts yet';
       if (!accounts.length) document.getElementById('addPanel').hidden = false;
       document.getElementById('accounts').hidden = !accounts.length;
-      document.getElementById('accountList').innerHTML = accounts.map(a =>
-        `<div class="channel-row">
-          <span>${esc(a.title)}</span>
-          <span class="channel-actions">
-            <button class="row-btn" onclick="refreshAccount('${esc(a.channel_id)}', this)">Refresh</button>
-            ${deleteButton(`removeAccount('${esc(a.channel_id)}')`, {label: 'Remove'})}
-          </span>
-        </div>`).join('');
+      document.getElementById('accountList').innerHTML = followRows(accounts);
     }
 
     if (MANAGE) {
@@ -227,47 +210,7 @@
         panel.hidden = !panel.hidden;
       });
 
-      document.getElementById('addForm').addEventListener('submit', async e => {
-        e.preventDefault();
-        const button = document.getElementById('addSubmit');
-        button.disabled = true; button.textContent = 'Adding…'; message('Looking up account…');
-        try {
-          const res = await fetch('/api/tiktok/accounts', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({url: document.getElementById('accountUrl').value}),
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Could not add account');
-          document.getElementById('accountUrl').value = '';
-          message('Account added.');
-          await load();
-        } catch (err) { message(friendlyError(err.message), true); }
-        button.disabled = false; button.textContent = 'Add';
-      });
-    }
-
-    async function refreshAccount(id, button) {
-      button.disabled = true; button.textContent = 'Refreshing…';
-      try {
-        const res = await fetch('/api/feed/refresh', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({channel_id: id, force: true}),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Could not refresh');
-        await load();
-        message('Account refreshed.');
-      } catch (err) {
-        message(friendlyError(err.message), true);
-        button.disabled = false; button.textContent = 'Refresh';
-      }
-    }
-
-    async function removeAccount(id) {
-      await fetch(`/api/feed/subscriptions/${encodeURIComponent(id)}`, {method: 'DELETE'});
-      await load();
+      wireFollowForm();
     }
 
     load();
