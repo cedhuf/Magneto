@@ -203,6 +203,10 @@ MIGRATIONS = [
     ALTER TABLE channels ADD COLUMN platform TEXT NOT NULL DEFAULT 'youtube';
     """,
     """
+    ALTER TABLE channels ADD COLUMN has_videos INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE channels ADD COLUMN has_shorts INTEGER NOT NULL DEFAULT 1;
+    """,
+    """
     CREATE TABLE shares (
         token      TEXT PRIMARY KEY,
         job_id     TEXT NOT NULL,
@@ -511,17 +515,17 @@ def stalest_slot():
         queue.append("SELECT c.channel_id, c.channel_url, c.platform, 'videos' AS tab, "
                      "c.refreshed_at AS age FROM channels c "
                      "JOIN follows f ON f.channel_id = c.channel_id "
-                     "WHERE c.platform = 'youtube'")
+                     "WHERE c.platform = 'youtube' AND c.has_videos = 1")
     if SHORTS_ENABLED:
         queue.append("SELECT c.channel_id, c.channel_url, c.platform, 'shorts' AS tab, "
                      "c.shorts_refreshed_at AS age FROM channels c "
                      "JOIN follows f ON f.channel_id = c.channel_id "
-                     "WHERE c.platform = 'youtube'")
+                     "WHERE c.platform = 'youtube' AND c.has_shorts = 1")
     if TIKTOK_ENABLED:
         queue.append("SELECT c.channel_id, c.channel_url, c.platform, 'shorts' AS tab, "
                      "c.shorts_refreshed_at AS age FROM channels c "
                      "JOIN follows f ON f.channel_id = c.channel_id "
-                     "WHERE c.platform = 'tiktok'")
+                     "WHERE c.platform = 'tiktok' AND c.has_shorts = 1")
     if not queue:
         return None
     with connect() as conn:
@@ -531,6 +535,28 @@ def stalest_slot():
         return conn.execute(
             f"SELECT * FROM ({' UNION ALL '.join(queue)}) WHERE age < ? "
             "ORDER BY age, tab = ? LIMIT 1", (cutoff, last_tab)).fetchone()
+
+
+def note_failure(row, error):
+    """A slot that failed must leave the head of the queue, or it holds every
+    channel behind it: the queue is ordered by age, so a slot whose age is never
+    written is picked again on the next tick, and on every tick after that.
+
+    Not having a tab at all is permanent, so that slot leaves the queue for
+    good rather than coming back once a TTL. Everything else is treated as
+    passing bad luck and simply waits its turn again.
+    """
+    column = "shorts_refreshed_at" if row["tab"] == "shorts" else "refreshed_at"
+    message = str(error).lower()
+    if "does not have a" in message and "tab" in message:
+        flag = "has_shorts" if row["tab"] == "shorts" else "has_videos"
+        with connect() as conn:
+            conn.execute(f"UPDATE channels SET {flag} = 0 WHERE channel_id = ?",
+                         (row["channel_id"],))
+        return
+    with connect() as conn:
+        conn.execute(f"UPDATE channels SET {column} = ? WHERE channel_id = ?",
+                     (time.time(), row["channel_id"]))
 
 
 def feed_poller():
@@ -543,6 +569,7 @@ def feed_poller():
     global last_tab
     while True:
         time.sleep(FEED_POLL)
+        row = None
         try:
             row = stalest_slot()
             if not row:
@@ -554,6 +581,8 @@ def feed_poller():
                 refresh_channel(row["channel_url"], row["channel_id"])
         except Exception as e:
             app.logger.warning("feed refresh failed: %s", e)
+            if row is not None:
+                note_failure(row, e)
 
 
 def janitor():
