@@ -1024,6 +1024,11 @@ def feed():
         # The cache holds the instance maximum; the account's own count is a
         # display choice, so changing it needs no lookup at all.
         channel["videos"] = json.loads(channel["videos"])[:settings["videos"]]
+        # When this channel's list was last read, and whether it turned out not
+        # to have a Videos tab at all: the list below the feed is the only place
+        # that says why a channel shows nothing.
+        channel["fetched"] = row["refreshed_at"]
+        channel["failed"] = not row["has_videos"]
         channels.append(channel)
         videos.extend({**video, "uploader": row["title"], "channel_id": row["channel_id"],
                        "ready": video["url"] in ready,
@@ -1078,7 +1083,8 @@ def upright_clips(owner, platform, with_accounts=False):
     settings = get_settings(owner)
     with connect() as conn:
         rows = conn.execute(
-            "SELECT c.channel_id, c.title, c.shorts, c.platform FROM channels c "
+            "SELECT c.channel_id, c.title, c.shorts, c.platform, "
+            "c.shorts_refreshed_at, c.has_shorts FROM channels c "
             "JOIN follows f ON f.channel_id = c.channel_id "
             "WHERE f.owner = ? AND c.platform = ? "
             "ORDER BY c.title COLLATE NOCASE", (owner, platform)).fetchall()
@@ -1105,8 +1111,9 @@ def upright_clips(owner, platform, with_accounts=False):
     payload = {"clips": interleaved, "quality": settings["quality"],
                "share": SHARE_ENABLED}
     if with_accounts:
-        payload["accounts"] = [{"channel_id": r["channel_id"], "title": r["title"]}
-                               for r in rows]
+        payload["accounts"] = [{"channel_id": r["channel_id"], "title": r["title"],
+                                "fetched": r["shorts_refreshed_at"],
+                                "failed": not r["has_shorts"]} for r in rows]
     return payload
 
 

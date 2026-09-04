@@ -7,6 +7,8 @@
 function followRows(items) {
   return items.map(item => `<div class="channel-row">
     <span>${esc(item.title)}</span>
+    <span class="channel-when${item.failed ? ' failed' : ''}">${
+      item.failed ? 'no videos tab' : fmtAgo(item.fetched)}</span>
     <span class="channel-actions">
       <button class="row-btn" onclick="refreshFollowed('${esc(item.channel_id)}', this)">Refresh</button>
       ${deleteButton(`unfollow('${esc(item.channel_id)}')`, {label: 'Remove'})}

@@ -21,6 +21,17 @@ function fmtDur(s) {
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 }
 
+/* A channel list says when, not at what time: the exact minute of a listing
+   nobody asked for is noise, the day it stopped being read is not. */
+function fmtAgo(seconds) {
+  if (!seconds) return 'never';
+  const since = Date.now() / 1000 - seconds;
+  for (const [size, tag] of [[86400, 'd'], [3600, 'h'], [60, 'm']]) {
+    if (since >= size) return `${Math.floor(since / size)}${tag} ago`;
+  }
+  return 'just now';
+}
+
 function fmtSize(n) {
   if (!n) return '';
   return n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.round(n / 1e6)} MB`;

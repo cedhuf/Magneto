@@ -515,7 +515,11 @@ textarea::placeholder { color: var(--muted); }
 .subscriptions { margin-top: 40px; }
 .channel-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; }
 .channel-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 10px 2px; border-bottom: 1px solid var(--card-border); font-size: .74rem; }
-.channel-row > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.channel-row > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; }
+/* Pushed against the buttons and never wrapped: it is a footnote to the name,
+   not a column of its own. */
+.channel-when { flex: 0 0 auto; margin-left: auto; font-size: 0.64rem; color: var(--muted); white-space: nowrap; }
+.channel-when.failed { color: var(--error); }
 .channel-actions { display: flex; gap: 6px; flex: 0 0 auto; }
 
 .history { margin-top: 40px; }
