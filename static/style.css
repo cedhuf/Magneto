@@ -331,7 +331,17 @@ textarea::placeholder { color: var(--muted); }
   align-self: auto;
 }
 .cards.grid .card-body { padding: 12px 14px 0; }
-.cards.grid .card-title { white-space: normal; }
+.cards.grid .card-title {
+  /* Two lines, always: reserving the room is what keeps every tile the same
+     height whatever the title says. */
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  min-height: calc(2 * 1.3em);
+  overflow: hidden;
+}
+.cards.grid .card { height: 100%; }
 .cards.grid .card-side {
   flex-direction: row;
   width: 100%;
@@ -767,6 +777,9 @@ audio.modal-media {
 }
 
 .card-dl-btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
   padding: 5px 14px;
   border: 1.5px solid var(--accent);
   border-radius: 7px;
@@ -1014,7 +1027,11 @@ audio.modal-media {
   text-align: left;
   width: 100%;
   cursor: pointer;
-  font: inherit;
+  /* Not font: inherit, which would take the body's monospace: a title stays a
+     title whether it is a div or a button. */
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
   color: inherit;
 }
 .card-title.as-text:hover { color: var(--accent); }
