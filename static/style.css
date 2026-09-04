@@ -362,12 +362,15 @@ textarea::placeholder { color: var(--muted); }
   flex: 0 0 auto;
   flex-direction: row;
   align-items: stretch;
-  margin: 0 12px 12px;
+  margin: 10px 12px 12px;
 }
 .cards.grid .card-icons {
   border-top: none;
   border-left: 1.5px solid var(--card-border);
 }
+/* Laid down, the icons would be squeezed by the action taking all it can: they
+   keep a size a finger can hit instead. */
+.cards.grid .card-icons .icon-btn { flex: 0 0 42px; }
 
 /* Admin */
 .brand-actions {
@@ -402,6 +405,13 @@ textarea::placeholder { color: var(--muted); }
   background: var(--card);
   padding: 16px 18px;
 }
+/* Shorts sit apart from what people kept: same tile, dashed and unfilled, the
+   way a temporary thing should look next to a permanent one. */
+.stat-shorts {
+  border-style: dashed;
+  background: none;
+}
+.stat-shorts .stat-value { color: var(--muted); }
 .stat-value {
   font-family: 'Instrument Serif', serif;
   font-size: 1.7rem;
@@ -1038,9 +1048,10 @@ audio.modal-media {
     flex: 0 0 auto;
     flex-direction: row;
     align-items: stretch;
-    margin: 0 14px 14px;
+    margin: 10px 14px 14px;
   }
   .card-icons { border-top: none; border-left: 1.5px solid var(--card-border); }
+  .card-icons .icon-btn { flex: 0 0 46px; }
   .card-title { white-space: normal; }
   .controls { flex-wrap: wrap; }
   .fetch-btn { width: 100%; }
@@ -1068,6 +1079,10 @@ audio.modal-media {
 }
 .icon-btn svg { width: 14px; height: 14px; }
 .icon-btn:hover { color: var(--fg); border-color: var(--card-border); }
+
+/* The width is set for the longest of the two labels, and the page is
+   border-box, where a min-width would have been eaten by the padding. */
+.del-btn { box-sizing: content-box; }
 
 /* Armed by a first click: the next one deletes. Red is a state here, not a
    hover, so it must beat the hover rules of both shapes. */

@@ -46,6 +46,7 @@
   <script src="/static/modal.js"></script>
   <script src="/static/card.js"></script>
   <script src="/static/delete.js"></script>
+  <script src="/static/actions.js"></script>
   <script>
     let currentFormat = 'video';
     let cardData = [];
@@ -481,14 +482,12 @@
        exempt the file. Deleting takes the file and the entry. */
     function entryActions(idx, c) {
       if (!c.jobId || c.status === 'downloading') return '';
-      const canPin = c.status === 'done';
-      const pin = icon(c.pinned ? 'pinned' : 'pin');
-      return `<div class="card-icons">
-        ${canPin ? `<button class="icon-btn${c.pinned ? ' on' : ''}" onclick="togglePin(${idx})"
-          title="${c.pinned ? 'Pinned, click to unpin' : 'Keep this one longer'}"
-          aria-label="Pin">${pin}</button>` : ''}
-        ${deleteButton(`removeCard(${idx})`, {icon: true})}
-      </div>`;
+      return entryIcons({
+        pinned: c.pinned,
+        // A file is what a pin postpones, so there is nothing to pin without one.
+        onPin: c.status === 'done' ? `togglePin(${idx})` : '',
+        onDelete: `removeCard(${idx})`,
+      });
     }
 
     async function togglePin(idx) {

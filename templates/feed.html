@@ -49,6 +49,7 @@
   <script src="/static/modal.js"></script>
   <script src="/static/card.js"></script>
   <script src="/static/delete.js"></script>
+  <script src="/static/actions.js"></script>
   <script>
     let feedVideos = [];
     let feedChannels = [];
@@ -81,8 +82,12 @@
         play: `playVideo(${i})`,
         title: v.title,
         meta: [esc(v.uploader), fmtDate(v.upload_date)].filter(Boolean).join(' \u00b7 '),
+        // The same block as the home page once the file is this account's: a
+        // feed video that has been downloaded is a download like any other.
         actions: `<button class="card-dl-btn" id="save-${i}" onclick="saveVideo(${i})">${
-          v.ready ? 'Save' : 'Download'}</button>`,
+          v.ready ? 'Save' : 'Download'}</button>`
+          + (v.job_id ? entryIcons({pinned: v.pinned, onPin: `togglePin(${i})`,
+                                    onDelete: `removeVideo(${i})`}) : ''),
       })).join('');
       // The head is the only way to add a channel, so it stays even when there
       // is nothing yet. What it offers is what makes sense at that moment.
@@ -285,6 +290,23 @@
         a.click();
         message('Saved.');
       } catch (err) { message(friendlyError(err.message), true); }
+    }
+
+    /* A feed video that has a file is an entry of this account, so it takes the
+       same two actions as on the home page. */
+    async function togglePin(index) {
+      const video = feedVideos[index];
+      const res = await fetch(`/api/entries/${video.job_id}/pin`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({pinned: !video.pinned}),
+      });
+      if (res.ok) await load();
+    }
+
+    async function removeVideo(index) {
+      await fetch(`/api/entries/${feedVideos[index].job_id}`, {method: 'DELETE'});
+      await load();
     }
 
     async function removeChannel(id) {

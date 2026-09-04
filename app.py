@@ -832,6 +832,13 @@ def feed():
         ready = {r["url"] for r in conn.execute(
             "SELECT url, path FROM entries WHERE variant = ? AND status = 'done' "
             "AND path IS NOT NULL", (variant,)) if os.path.exists(r["path"])}
+        # Whose entry it is decides what can be done with it: playing reuses
+        # anybody's file, but pinning and deleting only ever touch your own row.
+        mine = {r["url"]: {"job_id": r["job_id"], "pinned": bool(r["pinned"])}
+                for r in conn.execute(
+                    "SELECT url, job_id, pinned, path FROM entries WHERE owner = ? "
+                    "AND variant = ? AND status = 'done' AND path IS NOT NULL",
+                    (owner, variant)) if os.path.exists(r["path"])}
 
     channels = []
     videos = []
@@ -842,7 +849,8 @@ def feed():
         channel["videos"] = json.loads(channel["videos"])[:settings["videos"]]
         channels.append(channel)
         videos.extend({**video, "uploader": row["title"], "channel_id": row["channel_id"],
-                       "ready": video["url"] in ready}
+                       "ready": video["url"] in ready,
+                       **mine.get(video["url"], {"job_id": None, "pinned": False})}
                       for video in channel["videos"])
     # YYYYMMDD sorts correctly as a string. Unknown dates naturally sink.
     videos.sort(key=lambda video: video["upload_date"], reverse=True)

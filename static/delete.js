@@ -52,7 +52,10 @@ function armDelete(button) {
   return false;
 }
 
-// Anywhere else on the page, and the button forgets it was armed.
+/* Anywhere else on the page, and the button forgets it was armed. On the
+   capture phase, which is the whole trick: arming replaces the icon, so by the
+   time a bubbling handler ran, the clicked node was detached, closest() found
+   nothing and the button disarmed itself on its own first click. */
 document.addEventListener('click', e => {
   if (armedDelete && !(e.target.closest && e.target.closest('.del-btn'))) disarmDelete();
-});
+}, true);
