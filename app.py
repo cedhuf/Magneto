@@ -1135,6 +1135,17 @@ def follow(owner, url, fetch):
     return jsonify(channel)
 
 
+def tiktok_channel_id(account_url, minted):
+    """Reuse the row an import already made for this account rather than mint a
+    second id for it: the import knows the handle, a lookup knows TikTok's own
+    id, and the same person must not end up followed twice."""
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT channel_id FROM channels WHERE channel_url = ? AND platform = 'tiktok'",
+            (account_url,)).fetchone()
+    return row["channel_id"] if row else minted
+
+
 def follow_tiktok(url):
     """Record a TikTok account, its videos already in the shorts column.
 
@@ -1145,6 +1156,7 @@ def follow_tiktok(url):
     with feed_lock:
         last_channel_call = time.time()
         account = fetch_tiktok(url, FEED_VIDEOS_MAX)
+    account["channel_id"] = tiktok_channel_id(account["channel_url"], account["channel_id"])
     with connect() as conn:
         conn.execute(
             "INSERT INTO channels (channel_id, channel_url, title, thumbnail, videos, "
@@ -1215,6 +1227,57 @@ def import_subscriptions():
     return jsonify({"added": added, "already": already, "skipped": skipped,
                     "full": full, "limit": FEED_CHANNELS_MAX,
                     "every": FEED_POLL})
+
+
+@app.route("/api/tiktok/import", methods=["POST"])
+def import_tiktok():
+    """Take the handles read out of a TikTok export.
+
+    The file itself never comes here: it carries the account's phone number,
+    address and email a couple of keys away from the list of accounts, so the
+    page reads it and sends the handles alone. Nothing is looked up either, for
+    the same reason the YouTube import looks nothing up: a hundred requests in
+    one breath is how an address gets refused.
+    """
+    owner = current_user()
+    names = (request.json or {}).get("accounts")
+    if not isinstance(names, list) or not names:
+        return jsonify({"error": "No accounts found in this file"}), 400
+
+    with connect() as conn:
+        followed = {r["channel_id"] for r in conn.execute(
+            "SELECT channel_id FROM follows WHERE owner = ?", (owner,))}
+
+    added, already, skipped, full = 0, 0, 0, False
+    for name in names[:1000]:
+        if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9._]{1,24}", name):
+            skipped += 1
+            continue
+        url = f"https://www.tiktok.com/@{name}"
+        channel_id = tiktok_channel_id(url, f"tiktok:{name}")
+        if channel_id in followed:
+            already += 1
+            continue
+        if len(followed) >= FEED_CHANNELS_MAX:
+            full = True
+            break
+        with connect() as conn:
+            # Dated zero, so the poller takes the freshly imported ones first.
+            # The handle stands as the title until it does.
+            conn.execute(
+                "INSERT INTO channels (channel_id, channel_url, title, thumbnail, "
+                "videos, refreshed_at, shorts, shorts_refreshed_at, platform) "
+                "VALUES (?, ?, ?, '', '[]', 0, '[]', 0, 'tiktok') "
+                "ON CONFLICT(channel_id) DO NOTHING", (channel_id, url, f"@{name}"))
+            conn.execute("INSERT OR IGNORE INTO follows (owner, channel_id) VALUES (?, ?)",
+                         (owner, channel_id))
+        followed.add(channel_id)
+        added += 1
+
+    if not (added or already or skipped):
+        return jsonify({"error": "No accounts found in this file"}), 400
+    return jsonify({"added": added, "already": already, "skipped": skipped,
+                    "full": full, "limit": FEED_CHANNELS_MAX, "every": FEED_POLL})
 
 
 @app.route("/api/feed/refresh", methods=["POST"])

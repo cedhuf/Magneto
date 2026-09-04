@@ -79,6 +79,13 @@ per-video lookup, and it takes one place in the refresh queue rather than two
 since it has no long videos. The switch is independent: the page works with the
 feed off.
 
+**Accounts** takes an account URL, or the `user_data_tiktok.json` of a TikTok
+export. That file is read in the browser and never uploaded: it carries the
+account's phone number, address and email a couple of keys away from the list of
+accounts, and only the handles are sent. As with the YouTube import, nothing is
+looked up: every account is followed at once and the poller fills them one at a
+time.
+
 The shorts tab of a channel is a second listing, so a channel takes two places
 in the refresh queue instead of one. The outbound rate is unchanged, one lookup
 per `RECLIP_FEED_POLL` whatever is enabled; what changes is that each tab comes

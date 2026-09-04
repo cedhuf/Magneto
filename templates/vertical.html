@@ -26,6 +26,10 @@
         <input id="followUrl" type="url" placeholder="Paste a TikTok account URL…" required>
         <button class="fetch-btn" id="addSubmit">Add</button>
       </form>
+      <label class="feed-import">
+        <span>Or import user_data_tiktok.json from a TikTok export</span>
+        <input type="file" id="importFile" accept=".json,application/json">
+      </label>
       <div class="channel-list" id="accountList"></div>
     </div>
     {% endif %}
@@ -294,6 +298,55 @@
       });
 
       wireFollowForm();
+      wireImport();
+    }
+
+    /* The export is read here and never uploaded: it carries the account's
+       phone number, address and email a couple of keys away from the list of
+       accounts. Only the handles leave the browser. */
+    function followedAccounts(data) {
+      const found = [];
+      const walk = (node, key) => {
+        if (Array.isArray(node)) {
+          // Every list of {UserName} is a list of people, but the followers are
+          // one of them too. The branch is named rather than the path, which
+          // TikTok renames between exports.
+          if (!/following/i.test(key)) return;
+          for (const item of node) {
+            if (item && typeof item.UserName === 'string') found.push(item.UserName.trim());
+          }
+        } else if (node && typeof node === 'object') {
+          for (const [name, value] of Object.entries(node)) walk(value, name);
+        }
+      };
+      walk(data, '');
+      return [...new Set(found)].filter(Boolean);
+    }
+
+    function wireImport() {
+      document.getElementById('importFile').addEventListener('change', async e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        message('Reading the file\u2026');
+        try {
+          const accounts = followedAccounts(JSON.parse(await file.text()));
+          if (!accounts.length) throw new Error('No accounts found in this file');
+          const res = await fetch('/api/tiktok/import', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({accounts}),
+          });
+          const d = await res.json();
+          if (!res.ok) throw new Error(d.error || 'Could not read this file');
+          await load();
+          const parts = [`${d.added} account${d.added === 1 ? '' : 's'} added`];
+          if (d.already) parts.push(`${d.already} already followed`);
+          if (d.skipped) parts.push(`${d.skipped} unreadable`);
+          if (d.full) parts.push(`stopped at the ${d.limit} account limit`);
+          message(`${parts.join(', ')}. Videos arrive one account every ${Math.round(d.every / 60)} min.`);
+        } catch (err) { message(friendlyError(err.message), true); }
+        e.target.value = '';
+      });
     }
 
     load();
