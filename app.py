@@ -46,6 +46,14 @@ PIN_RETENTION = int(os.environ.get("RECLIP_PIN_RETENTION", 30 * 24 * 3600))
 HISTORY_MAX = int(os.environ.get("RECLIP_HISTORY_MAX", 200))
 SWEEP_INTERVAL = 60
 
+# YouTube judges an IPv6 prefix on the whole neighbourhood behind it, so a host
+# that has never asked for anything is refused with "Sign in to confirm you're
+# not a bot" while the same request over v4, from the same machine, goes
+# through. Set RECLIP_FORCE_IPV4=0 on a host that has no v4 route at all.
+FORCE_IPV4 = os.environ.get("RECLIP_FORCE_IPV4", "1") not in ("0", "false", "no", "")
+# Every invocation starts from here, so the flag cannot be forgotten on one.
+YTDLP = ["yt-dlp"] + (["--force-ipv4"] if FORCE_IPV4 else [])
+
 # "proxy" reads the identity a forward_auth proxy puts in front of us. Anything
 # else means a single implicit user. The switch is explicit on purpose: falling
 # back to that user when the header is merely missing would silently merge every
@@ -438,7 +446,7 @@ threading.Thread(target=janitor, daemon=True).start()
 def run_download(job_id, url, format_choice, format_id, title, max_height=None):
     out_template = os.path.join(DOWNLOAD_DIR, f"{job_id}.%(ext)s")
 
-    cmd = ["yt-dlp", "--no-playlist", "-o", out_template]
+    cmd = [*YTDLP, "--no-playlist", "-o", out_template]
 
     if format_choice == "audio":
         cmd += ["-x", "--audio-format", "mp3"]
@@ -577,7 +585,7 @@ def parse_ytdlp_lines(stdout):
 def resolve_videos(urls):
     if not urls:
         return {}
-    cmd = ["yt-dlp", "--no-playlist", "-j", "--", *urls]
+    cmd = [*YTDLP, "--no-playlist", "-j", "--", *urls]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     return parse_ytdlp_lines(result.stdout)
 
@@ -592,7 +600,7 @@ def fetch_channel(url, known=None, count=None):
     videos_url = youtube_videos_url(url)
     if not videos_url:
         raise ValueError("Please enter a YouTube channel URL")
-    cmd = ["yt-dlp", "--flat-playlist", "--playlist-end", str(count or FEED_DEFAULTS["videos"]),
+    cmd = [*YTDLP, "--flat-playlist", "--playlist-end", str(count or FEED_DEFAULTS["videos"]),
            "-J", "--", videos_url]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
     if result.returncode != 0:
@@ -962,7 +970,7 @@ def get_info():
     if not is_safe_url(url):
         return jsonify({"error": "Invalid URL"}), 400
 
-    cmd = ["yt-dlp", "--no-playlist", "-j", "--", url]
+    cmd = [*YTDLP, "--no-playlist", "-j", "--", url]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         if result.returncode != 0:
@@ -1048,7 +1056,7 @@ def get_playlist_info():
     if not is_safe_url(url):
         return jsonify({"error": "Invalid URL"}), 400
 
-    cmd = ["yt-dlp", "--flat-playlist", "--playlist-end", str(PLAYLIST_MAX + 1),
+    cmd = [*YTDLP, "--flat-playlist", "--playlist-end", str(PLAYLIST_MAX + 1),
            "-J", "--", url]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)

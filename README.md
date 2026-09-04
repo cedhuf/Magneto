@@ -69,6 +69,13 @@ users or channels there are. A manual refresh obeys the same spacing and skips
 channels looked up less than `RECLIP_FEED_COOLDOWN` ago, reporting them as
 already fresh rather than as failures.
 
+A refusal saying "Sign in to confirm you're not a bot" is usually not about
+volume: YouTube judges an IPv6 prefix on every subscriber behind it, so a fresh
+instance can be refused for its neighbours. `RECLIP_FORCE_IPV4` is on for that
+reason. If it still happens over v4, the address itself is flagged and only
+cookies from a throwaway account help, with the account ban that yt-dlp warns
+about.
+
 ## Quality and compatibility
 
 YouTube publishes no H.264 above 1080p: 1440p and 2160p exist only as VP9 or
@@ -138,6 +145,7 @@ date rather than stored.
 | `RECLIP_HISTORY_MAX` | `200` | Entries kept per user. Older ones are dropped, pinned ones never |
 | `RECLIP_DB` | `data/reclip.db` | SQLite file. Put it on the same volume as the downloads, not inside the downloads directory |
 | `RECLIP_BIND` | `0.0.0.0:8899` | What gunicorn listens on. In proxy mode, `127.0.0.1:8899` when the proxy is on the same host; otherwise the reachable address, with the port firewalled to the proxy |
+| `RECLIP_FORCE_IPV4` | `1` | Ask YouTube over IPv4. A v6 prefix is judged on everything behind it, so a host that has downloaded nothing at all can be refused with "Sign in to confirm you're not a bot" while the same request over v4 succeeds from the same machine. Set to `0` only on a host with no v4 route |
 | `RECLIP_NO_UPDATE` | unset | Set to any value to skip the yt-dlp update at container start. There is no good reason to: extractors break every few weeks and the update is the fix |
 | `HOST` / `PORT` | `127.0.0.1` / `8899` | Only used by `python app.py` and `reclip.sh`. The image goes through gunicorn and reads `RECLIP_BIND` |
 

@@ -28,6 +28,9 @@ function fmtSize(n) {
 
 function friendlyError(err) {
   if (!err) return '';
+  // yt-dlp's own wording tells a family member to pass cookies, which is not
+  // something they can act on.
+  if (err.includes('not a bot')) return 'YouTube is refusing this server right now, try later';
   if (err.includes('Unsupported URL')) return 'This URL is not supported';
   if (err.includes('Video unavailable')) return 'Video is unavailable or private';
   if (err.includes('Private video')) return 'This video is private';
