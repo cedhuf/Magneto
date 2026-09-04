@@ -968,7 +968,8 @@ def gate_optional_pages():
     """One gate rather than a check on each route, so a route added later
     cannot forget to close behind itself."""
     path = request.path
-    if not FEED_ENABLED and (path == "/feed" or path.startswith("/api/feed")):
+    if not FEED_ENABLED and (path == "/feed" or path.startswith("/api/feed")) \
+            and not path.startswith(("/api/feed/subscriptions", "/api/feed/refresh")):
         abort(404)
     if not SHORTS_ENABLED and (path == "/shorts" or path.startswith("/api/shorts")):
         abort(404)
@@ -976,9 +977,10 @@ def gate_optional_pages():
         abort(404)
     if not SHARE_ENABLED and (path.startswith("/s/") or path.startswith("/api/share")):
         abort(404)
-    # Removing and refreshing a followed account is the same route whichever
-    # page follows it, so it opens as soon as one of them is on.
-    if not (FEED_ENABLED or TIKTOK_ENABLED) and path.startswith("/api/feed/subscriptions"):
+    # Following, refreshing and unfollowing an account are the same routes
+    # whichever page follows it, so they open as soon as one of them is on.
+    shared = ("/api/feed/subscriptions", "/api/feed/refresh")
+    if not (FEED_ENABLED or TIKTOK_ENABLED) and path.startswith(shared):
         abort(404)
 
 
@@ -1334,19 +1336,32 @@ def refresh_feed():
     force = bool(data.get("force"))
     with connect() as conn:
         row = conn.execute(
-            "SELECT c.channel_url, c.refreshed_at FROM channels c "
-            "JOIN follows f ON f.channel_id = c.channel_id "
+            "SELECT c.channel_url, c.platform, c.refreshed_at, c.shorts_refreshed_at "
+            "FROM channels c JOIN follows f ON f.channel_id = c.channel_id "
             "WHERE f.owner = ? AND c.channel_id = ?", (owner, channel_id)).fetchone()
     if row is None:
         return jsonify({"error": "Unknown channel"}), 404
+    # A TikTok account has no long videos: its list is the upright one, so it is
+    # that lookup and that clock, not the feed's.
+    upright = row["platform"] == "tiktok"
+    last = row["shorts_refreshed_at"] if upright else row["refreshed_at"]
     # Clicking twice must not cost two lookups, and a page full of channels must
     # not become a burst of them.
-    if not force and time.time() - row["refreshed_at"] < FEED_COOLDOWN:
+    if not force and time.time() - last < FEED_COOLDOWN:
         return jsonify({"ok": True, "skipped": "recent"})
     if not force and not channel_call_allowed():
         return jsonify({"ok": True, "skipped": "busy"})
     try:
-        refresh_channel(row["channel_url"], channel_id)
+        if upright:
+            refresh_shorts(row["channel_url"], channel_id, row["platform"])
+        else:
+            refresh_channel(row["channel_url"], channel_id)
+        # A tab the poller gave up on is worth one more try when someone asks
+        # for it by hand, otherwise dropping it is a door that never reopens.
+        flag = "has_shorts" if upright else "has_videos"
+        with connect() as conn:
+            conn.execute(f"UPDATE channels SET {flag} = 1 WHERE channel_id = ?",
+                         (channel_id,))
         return jsonify({"ok": True})
     except subprocess.TimeoutExpired:
         return jsonify({"error": "Timed out"}), 400
