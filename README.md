@@ -179,6 +179,10 @@ reclip.example.com {
 Order matters: the `/s/*` block must come first, and it must not carry the
 `forward_auth` directive. Nothing else changes.
 
+One prefix is enough because the shared page loads nothing from `/static`,
+which stays behind the sign-in. It has its own small stylesheet and the two font
+files it uses, served from `/s/asset/` by name from a fixed table.
+
 **This one rule is the security boundary.** Widen it and the instance is open;
 forget it and every share link lands on a sign-in page. The application does
 its part: `/s/` routes take a token and never a job id or a user, an unknown

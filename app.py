@@ -1658,6 +1658,27 @@ def unindexed(response):
     return response
 
 
+# What the shared page is allowed to load, by name rather than by path: /static
+# is behind the proxy's authentication, so these few files are served again from
+# under /s. A fixed table, so no name from the URL ever reaches the filesystem.
+SHARED_ASSETS = {
+    "style.css": ("shared.css", "text/css"),
+    "mono.woff2": ("fonts/dmmono-400-latin.woff2", "font/woff2"),
+    "serif.woff2": ("fonts/instrumentserif-400-latin.woff2", "font/woff2"),
+}
+
+
+@app.route("/s/asset/<name>")
+def shared_asset(name):
+    found = SHARED_ASSETS.get(name)
+    if not found:
+        abort(404)
+    path = os.path.join(app.static_folder, found[0])
+    response = make_response(send_file(path, mimetype=found[1]))
+    response.headers["Cache-Control"] = "public, max-age=86400"
+    return unindexed(response)
+
+
 @app.route("/s/<token>")
 def shared_page(token):
     row = shared_entry(token)

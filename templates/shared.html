@@ -1,23 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 {# A shared link is read by someone who has no account here, so the page holds
-   the video and nothing else: no navigation, no identity, no way in. #}
+   the video and nothing else: no navigation, no identity, no way in. It also
+   loads nothing from /static, which the proxy keeps behind its sign-in. #}
 <head>
-  {% set page_title = title or "ReClip" %}
-  {% include "_head.html" %}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title or "ReClip" }}</title>
   <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="/s/asset/style.css">
 </head>
 <body>
-  <div class="page shared">
-    <div class="shared-frame">
-      <video class="shared-video" src="/s/{{ token }}/stream" controls autoplay playsinline></video>
-      <div class="shared-caption">
-        <div class="shared-title">{{ title or "Untitled" }}</div>
-        {% if uploader %}<div class="shared-meta">{{ uploader }}</div>{% endif %}
-      </div>
-    </div>
-    <p class="shared-note">Shared from a private ReClip instance. The link expires.</p>
+  <video src="/s/{{ token }}/stream" controls autoplay playsinline></video>
+  <div class="caption">
+    <div class="title">{{ title or "Untitled" }}</div>
+    {% if uploader %}<div class="meta">{{ uploader }}</div>{% endif %}
   </div>
-  <script src="/static/theme.js"></script>
+  <p class="note">Shared from a private ReClip instance. This link expires.</p>
 </body>
 </html>
