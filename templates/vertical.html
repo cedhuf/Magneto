@@ -79,6 +79,29 @@
     let at = 0;
     let quality = 720;
     let sharing = false;
+    /* Where the reading stopped, kept in the browser rather than on the server:
+       it is a position, not data, and a reload should not send anyone back to
+       the top of a list they have already watched, nor make the instance fetch
+       those clips again. */
+    const SEEN = `seen:${SOURCE}`;
+    const SEEN_MAX = 300;
+    let seen = [];
+    let placed = false;
+
+    try { seen = JSON.parse(localStorage.getItem(SEEN)) || []; } catch (e) {}
+
+    function markSeen(url) {
+      if (!url || seen.includes(url)) return;
+      seen = [...seen, url].slice(-SEEN_MAX);
+      try { localStorage.setItem(SEEN, JSON.stringify(seen)); } catch (e) {}
+    }
+
+    /* The first clip not watched yet, or the last one when everything has been.
+       Never the top: that is the whole point. */
+    function firstUnseen() {
+      const next = clips.findIndex(clip => !seen.includes(clip.url));
+      return next < 0 ? Math.max(0, clips.length - 1) : next;
+    }
 
     function message(text, error = false) {
       const el = document.getElementById('message');
@@ -99,6 +122,9 @@
       document.getElementById('prevBtn').innerHTML = icon('up');
       document.getElementById('nextBtn').innerHTML = icon('down');
       if (MANAGE) renderAccounts();
+      // Only when the page opens: a reload after a deletion or an added account
+      // must not move the reader.
+      if (!placed) { at = firstUnseen(); placed = true; }
       render();
     }
 
@@ -133,6 +159,7 @@
       });
       mounted = -1;
       reel.replaceChildren(...slides);
+      reel.scrollTop = at * reel.clientHeight;
       watch();
       if (clips.length) show();
     }
@@ -154,6 +181,7 @@
     function show() {
       const clip = clips[at];
       if (!clip) return;
+      markSeen(clip.url);
       document.getElementById('prevBtn').disabled = at === 0;
       document.getElementById('nextBtn').disabled = at === clips.length - 1;
       document.getElementById('title').textContent = clip.title;

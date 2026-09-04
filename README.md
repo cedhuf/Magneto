@@ -72,6 +72,11 @@ is fetched while you watch, and both are gone after `RECLIP_SHORTS_RETENTION`.
 They stay out of the downloads list and out of the history ceiling, and `/admin`
 shows them as one line with a purge of their own.
 
+Reopening the page lands on the first clip not watched yet, never back at the
+top. What has been watched is remembered in the browser, not on the server: it
+is a reading position rather than data, so it stays on the device that read it,
+and it is what keeps a reload from fetching those clips a second time.
+
 ### TikTok
 
 **TikTok** is the same player with its own accounts, added from that page and
