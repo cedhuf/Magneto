@@ -205,6 +205,21 @@ A share also holds its file: a shared short would otherwise be swept an hour
 later and hand out a dead link. The file's deadline becomes the later of its
 own and the link's, and falls back the moment the link is revoked or expires.
 
+## Install it as an app
+
+ReClip carries a manifest, so both phones can add it to the home screen and run
+it without the browser's navigation. On iOS, Share then "Add to Home Screen";
+on Android, the menu offers "Install app". There is nothing to configure and no
+service worker: it is the same site, without the address bar.
+
+Behind a forward-auth proxy the manifest is requested with
+`crossorigin="use-credentials"`, otherwise the browser asks for it without
+cookies, gets the sign-in page back, and never offers to install. Nothing in
+the interface says so, which is why it is worth knowing.
+
+On iOS the status bar style is decided at install time. Changing it later needs
+the icon deleted and added again, not a reload.
+
 ## Configuration
 
 Everything is an environment variable, so a compose file is the whole

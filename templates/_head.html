@@ -4,6 +4,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ page_title }}</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+{# Installable, so the app runs without the browser's own navigation. The
+   manifest is fetched with credentials omitted unless this attribute says
+   otherwise, which behind a forward-auth proxy means it comes back as a
+   sign-in page and the install offer never appears. #}
+<link rel="manifest" href="/static/manifest.webmanifest" crossorigin="use-credentials">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ReClip">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f4f1eb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1a17" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="/static/style.css">
 <script>
   // Before first paint, or the page flashes light before the choice applies.
