@@ -1345,3 +1345,35 @@ audio.modal-media {
   color: var(--on-accent);
 }
 
+
+
+/* Following: one block per provider, its cost stated before its list. */
+.follow-block { margin-bottom: 40px; }
+.follow-block .feed-head { margin-top: 0; }
+.figures {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.figure {
+  padding: 12px 14px;
+  border: 1.5px solid var(--card-border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+.figure-label {
+  font-size: 0.6rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.figure-value {
+  margin-top: 6px;
+  font-family: 'Instrument Serif', serif;
+  font-size: 1.15rem;
+  color: var(--fg);
+}
+@media (max-width: 720px) {
+  .figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

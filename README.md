@@ -91,12 +91,7 @@ per-video lookup, and it takes one place in the refresh queue rather than two
 since it has no long videos. The switch is independent: the page works with the
 feed off.
 
-**Accounts** holds the same block as the feed's: an account URL, or the
-`user_data_tiktok.json` of a TikTok export, and the list of what you follow. That file is read in the browser and never uploaded: it carries the
-account's phone number, address and email a couple of keys away from the list of
-accounts, and only the handles are sent. As with the YouTube import, nothing is
-looked up: every account is followed at once and the poller fills them one at a
-time.
+Accounts are followed on the **Following** page, alongside the YouTube channels.
 
 Each platform has its own queue, its own clock and its own ceiling. YouTube
 cannot see what TikTok was asked, so making them share one budget had each
@@ -228,6 +223,26 @@ The guard rails, in the order they matter:
 A share also holds its file: a shared short would otherwise be swept an hour
 later and hand out a dead link. The file's deadline becomes the later of its
 own and the link's, and falls back the moment the link is revoked or expires.
+
+## Following
+
+Following is one act with several nouns, so it has one page rather than a panel
+on each reading page. **Following** lists every provider: a URL to add one, the
+export file to import many, and the list of what you already follow with its own
+**Refresh** and **Remove**.
+
+Each provider states what it costs before it lists anything: how many you follow
+against the ceiling, how many slots that puts in the refresh queue, how long one
+full round takes, and how many have never been read yet. The round is the number
+worth watching. It is the delay between a video being published and this
+instance knowing about it, and it is what says whether following more is worth
+it. A ceiling on its own says nothing anybody can act on.
+
+An import follows everybody at once and looks nobody up, so the poller fills
+them one at a time instead of asking a provider a hundred times in one breath.
+A TikTok export is read in the browser and never uploaded: it carries the
+account's phone number, address and email a couple of keys away from the list of
+accounts, and only the handles are sent.
 
 ## Install it as an app
 

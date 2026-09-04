@@ -989,7 +989,8 @@ def page_context():
     return {"auth": AUTH_MODE, "user": current_user(),
             "admin": is_admin(), "logout_url": LOGOUT_URL,
             "feed": FEED_ENABLED, "shorts": SHORTS_ENABLED, "tiktok": TIKTOK_ENABLED,
-            "share": SHARE_ENABLED}
+            "share": SHARE_ENABLED,
+            "following": FEED_ENABLED or SHORTS_ENABLED or TIKTOK_ENABLED}
 
 
 @app.before_request
@@ -1012,6 +1013,9 @@ def gate_optional_pages():
     if not (FEED_ENABLED or TIKTOK_ENABLED) and path.startswith(shared):
         abort(404)
     if not (SHORTS_ENABLED or TIKTOK_ENABLED) and path == "/api/seen":
+        abort(404)
+    if not (FEED_ENABLED or SHORTS_ENABLED or TIKTOK_ENABLED) \
+            and path in ("/following", "/api/following"):
         abort(404)
 
 
@@ -1079,9 +1083,9 @@ def feed():
 def shorts_page():
     return render_template(
         "vertical.html", page="shorts", heading="Shorts",
-        tagline="Shorts from your channels", source="/api/shorts", manage=False,
-        empty_note="Follow channels on the feed page, then wait for their shorts "
-                   "to be listed. One channel comes round every few minutes.",
+        tagline="Shorts from your channels", source="/api/shorts",
+        empty_note="Follow channels on the Following page, then wait for their "
+                   "shorts to be listed. One comes round every few minutes.",
         **page_context())
 
 
@@ -1089,16 +1093,16 @@ def shorts_page():
 def tiktok_page():
     return render_template(
         "vertical.html", page="tiktok", heading="TikTok",
-        tagline="The accounts you follow", source="/api/tiktok", manage=True,
-        empty_note="Add a TikTok account above. Its latest videos are listed "
-                   "shortly after, and fetched only when you watch one.",
+        tagline="The accounts you follow", source="/api/tiktok",
+        empty_note="Add a TikTok account on the Following page. Its latest videos "
+                   "are listed shortly after, and fetched only when you watch one.",
         **page_context())
 
 
 @app.route("/api/tiktok")
 def tiktok_list():
     """The followed accounts and their videos, newest of each in turn."""
-    return jsonify(upright_clips(current_user(), "tiktok", with_accounts=True,
+    return jsonify(upright_clips(current_user(), "tiktok",
                                  watched=request.args.get("watched") == "1"))
 
 
@@ -1108,7 +1112,7 @@ def shorts_list():
                                  watched=request.args.get("watched") == "1"))
 
 
-def upright_clips(owner, platform, with_accounts=False, watched=False):
+def upright_clips(owner, platform, watched=False):
     """Every followed account's upright videos, one from each in turn.
 
     A round is one video per account, so nobody takes the top of the page, and
@@ -1160,10 +1164,6 @@ def upright_clips(owner, platform, with_accounts=False, watched=False):
     # rather than "follow some accounts".
     payload = {"clips": interleaved, "quality": settings["quality"],
                "share": SHARE_ENABLED, "hidden": hidden, "watched": watched}
-    if with_accounts:
-        payload["accounts"] = [{"channel_id": r["channel_id"], "title": r["title"],
-                                "fetched": r["shorts_refreshed_at"],
-                                "failed": not r["has_shorts"]} for r in rows]
     return payload
 
 
@@ -1181,6 +1181,70 @@ def mark_seen():
                      "ON CONFLICT(owner, url) DO UPDATE SET at = excluded.at",
                      (owner, url.strip(), time.time()))
     return jsonify({"ok": True})
+
+
+PROVIDERS = [
+    {"platform": "youtube", "label": "YouTube", "noun": "Channel",
+     "add": "/api/feed/subscriptions", "import": "/api/feed/import",
+     "accept": ".csv,text/csv", "file": "subscriptions.csv of a YouTube export",
+     "hint": "Paste a YouTube channel URL\u2026"},
+    {"platform": "tiktok", "label": "TikTok", "noun": "Account",
+     "add": "/api/tiktok/accounts", "import": "/api/tiktok/import",
+     "accept": ".json,application/json", "file": "user_data_tiktok.json of a TikTok export",
+     "hint": "Paste a TikTok account URL\u2026"},
+]
+
+
+def provider_live(platform):
+    """A provider is here when a page reads it."""
+    return (FEED_ENABLED or SHORTS_ENABLED) if platform == "youtube" else TIKTOK_ENABLED
+
+
+def provider_state(owner, provider):
+    """What one provider costs right now.
+
+    The ceiling on its own says nothing anybody can act on. What a round takes
+    does: it is the delay between a video being published and this instance
+    knowing about it, and it is what says whether following more is worth it.
+    """
+    platform = provider["platform"]
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT c.channel_id, c.title, c.refreshed_at, c.shorts_refreshed_at, "
+            "c.has_videos, c.has_shorts FROM channels c "
+            "JOIN follows f ON f.channel_id = c.channel_id "
+            "WHERE f.owner = ? AND c.platform = ? ORDER BY c.title COLLATE NOCASE",
+            (owner, platform)).fetchall()
+    # A YouTube channel holds two slots when both pages are on, a TikTok account
+    # one. A tab found not to exist holds none.
+    slots = 0
+    for row in rows:
+        if platform == "youtube":
+            slots += (FEED_ENABLED and row["has_videos"]) + (SHORTS_ENABLED and row["has_shorts"])
+        else:
+            slots += bool(TIKTOK_ENABLED and row["has_shorts"])
+    listed = "refreshed_at" if platform == "youtube" else "shorts_refreshed_at"
+    seen_tab = "has_videos" if platform == "youtube" else "has_shorts"
+    return {**{k: v for k, v in provider.items() if k != "platform"},
+            "platform": platform,
+            "items": [{"channel_id": r["channel_id"], "title": r["title"],
+                       "fetched": r[listed], "failed": not r[seen_tab]} for r in rows],
+            "followed": len(rows), "limit": FEED_CHANNELS_MAX,
+            "slots": slots, "round": slots * FEED_POLL,
+            "never": sum(1 for r in rows if not r[listed] and r[seen_tab])}
+
+
+@app.route("/following")
+def following_page():
+    return render_template("following.html", page="following", **page_context())
+
+
+@app.route("/api/following")
+def following():
+    """Every provider in one place: following is one act, not a page's feature."""
+    owner = current_user()
+    return jsonify({"providers": [provider_state(owner, p) for p in PROVIDERS
+                                  if provider_live(p["platform"])]})
 
 
 @app.route("/api/feed/settings", methods=["POST"])

@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 {# One player for every upright source. Shorts and TikTok differ by where their
-   videos come from and by who manages the accounts, not by how they are read,
-   so they are the same page rendered twice. #}
+   videos come from, not by how they are read, so they are the same page
+   rendered twice. Who is followed belongs to the Following page. #}
 <head>
   {% set page_title = "ReClip — " ~ heading %}
   {% include "_head.html" %}
@@ -12,33 +12,13 @@
     {% include "_header.html" %}
 
     <div class="feed-head" id="feedHead">
-      <span id="accountCount"></span>
+      <span id="clipCount"></span>
       <span class="feed-head-actions">
-        {% if manage %}
-        <button class="link-btn" id="addBtn">Accounts</button>
-        <button class="link-btn" id="refreshBtn">Refresh all</button>
-        {% endif %}
         <button class="link-btn" id="watchedBtn">Show watched</button>
       </span>
     </div>
-    {% if manage %}
-    {# The list lives in the folded panel rather than under the player: on a page
-       whose whole point is one full-height video, a permanent block below it is
-       height taken from the video. #}
-    <div class="feed-panel feed-add-panel" id="addPanel" hidden>
-      <form class="feed-add" id="addForm">
-        <input id="followUrl" type="url" placeholder="Paste a TikTok account URL…" required>
-        <button class="fetch-btn" id="addSubmit">Add</button>
-      </form>
-      <label class="feed-import">
-        <span>Or import user_data_tiktok.json from a TikTok export</span>
-        <input type="file" id="importFile" accept=".json,application/json">
-      </label>
-      <div class="channel-list" id="accountList"></div>
-    </div>
-    {% endif %}
 
-    <div class="shorts{{ ' manage' if manage }}" id="stage">
+    <div class="shorts" id="stage">
       <div class="shorts-frame" id="frame" hidden>
         <div class="shorts-reel" id="reel"></div>
         <div class="shorts-rail">
@@ -67,9 +47,7 @@
   <script src="/static/format.js"></script>
   <script src="/static/delete.js"></script>
   <script src="/static/jobs.js"></script>
-  <script src="/static/follow.js"></script>
   <script>
-    const FOLLOWED = {noun: 'Account', add: '/api/tiktok/accounts'};
     const SOURCE = {{ source | tojson }};
     /* A clip left behind is watched, whatever it lasted: any threshold would
        need a timer and a rule about a paused tab, and arriving on one is
@@ -82,10 +60,8 @@
        ten, that is most of it. There, the video is read with a tap and a line
        says where it is. */
     const TAP = matchMedia('(hover: none)').matches;
-    const MANAGE = {{ manage | tojson }};
     const EMPTY_NOTE = {{ empty_note | tojson }};
     let clips = [];
-    let accounts = [];
     let at = 0;
     let quality = 720;
     let sharing = false;
@@ -102,14 +78,12 @@
       if (!res.ok) return;
       const data = await res.json();
       clips = data.clips;
-      accounts = data.accounts || [];
       quality = data.quality;
       sharing = data.share;
       hidden = data.hidden;
       at = Math.min(at, Math.max(0, clips.length - 1));
       document.getElementById('prevBtn').innerHTML = icon('up');
       document.getElementById('nextBtn').innerHTML = icon('down');
-      if (MANAGE) renderAccounts();
       renderCount();
       render();
     }
@@ -212,12 +186,8 @@
     /* The bar says what the reel holds, and the empty card has two things to
        say: nothing followed yet, or everything watched. */
     function renderCount() {
-      const clipCount = `${clips.length} clip${clips.length === 1 ? '' : 's'}`;
-      document.getElementById('accountCount').textContent = MANAGE
-        ? (accounts.length
-            ? `${clipCount} from ${accounts.length} account${accounts.length === 1 ? '' : 's'}`
-            : 'No accounts yet')
-        : clipCount;
+      document.getElementById('clipCount').textContent =
+        `${clips.length} clip${clips.length === 1 ? '' : 's'}`;
       const button = document.getElementById('watchedBtn');
       button.textContent = watched ? 'Hide watched' : 'Show watched';
       button.hidden = !watched && !hidden && !clips.length;
@@ -331,73 +301,9 @@
       }
     });
 
-    /* Only the pages that own their accounts manage them: shorts come from the
-       channels the feed page follows, TikTok accounts belong here. */
-    function renderAccounts() {
-      if (!accounts.length) document.getElementById('addPanel').hidden = false;
-      document.getElementById('refreshBtn').hidden = !accounts.length;
-      document.getElementById('accountList').innerHTML = followRows(accounts);
-    }
 
-    if (MANAGE) {
-      document.getElementById('addBtn').addEventListener('click', () => {
-        const panel = document.getElementById('addPanel');
-        panel.hidden = !panel.hidden;
-      });
 
-      wireFollowForm();
-      wireImport();
-      document.getElementById('refreshBtn').addEventListener('click', e =>
-        refreshAll(e.target, accounts, 'Refresh all'));
-    }
 
-    /* The export is read here and never uploaded: it carries the account's
-       phone number, address and email a couple of keys away from the list of
-       accounts. Only the handles leave the browser. */
-    function followedAccounts(data) {
-      const found = [];
-      const walk = (node, key) => {
-        if (Array.isArray(node)) {
-          // Every list of {UserName} is a list of people, but the followers are
-          // one of them too. The branch is named rather than the path, which
-          // TikTok renames between exports.
-          if (!/following/i.test(key)) return;
-          for (const item of node) {
-            if (item && typeof item.UserName === 'string') found.push(item.UserName.trim());
-          }
-        } else if (node && typeof node === 'object') {
-          for (const [name, value] of Object.entries(node)) walk(value, name);
-        }
-      };
-      walk(data, '');
-      return [...new Set(found)].filter(Boolean);
-    }
-
-    function wireImport() {
-      document.getElementById('importFile').addEventListener('change', async e => {
-        const file = e.target.files[0];
-        if (!file) return;
-        message('Reading the file\u2026');
-        try {
-          const accounts = followedAccounts(JSON.parse(await file.text()));
-          if (!accounts.length) throw new Error('No accounts found in this file');
-          const res = await fetch('/api/tiktok/import', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({accounts}),
-          });
-          const d = await res.json();
-          if (!res.ok) throw new Error(d.error || 'Could not read this file');
-          await load();
-          const parts = [`${d.added} account${d.added === 1 ? '' : 's'} added`];
-          if (d.already) parts.push(`${d.already} already followed`);
-          if (d.skipped) parts.push(`${d.skipped} unreadable`);
-          if (d.full) parts.push(`stopped at the ${d.limit} account limit`);
-          message(`${parts.join(', ')}. Videos arrive one account every ${Math.round(d.every / 60)} min.`);
-        } catch (err) { message(friendlyError(err.message), true); }
-        e.target.value = '';
-      });
-    }
 
     load();
   </script>

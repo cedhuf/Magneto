@@ -32,6 +32,17 @@ function fmtAgo(seconds) {
   return 'just now';
 }
 
+/* How long a full round takes, which is the delay between a video appearing and
+   this instance knowing about it. Hours and minutes, never seconds: nobody
+   plans around 51600. */
+function fmtRound(seconds) {
+  if (!seconds) return 'nothing queued';
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.round((seconds % 3600) / 60);
+  if (!hours) return `${minutes} min`;
+  return minutes ? `${hours} h ${String(minutes).padStart(2, '0')}` : `${hours} h`;
+}
+
 function fmtSize(n) {
   if (!n) return '';
   return n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.round(n / 1e6)} MB`;

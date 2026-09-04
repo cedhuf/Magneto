@@ -27,6 +27,9 @@
     {% if tiktok %}
       <a class="text-btn{{ ' active' if page == 'tiktok' }}" href="/tiktok">TikTok</a>
     {% endif %}
+    {% if following %}
+      <a class="text-btn{{ ' active' if page == 'following' }}" href="/following">Following</a>
+    {% endif %}
     {% if auth == 'proxy' and logout_url %}
       <a class="text-btn" href="{{ logout_url }}">Sign out</a>
     {% endif %}

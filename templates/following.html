@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+{# Following is one act, so it has one page. The reading pages read; accounts
+   are added, listed and dropped here, whatever provider they come from. #}
+<head>
+  {% set page_title = "ReClip — Following" %}
+  {% include "_head.html" %}
+</head>
+<body>
+  <div class="page">
+    {% set tagline = "Who this instance watches" %}
+    {% include "_header.html" %}
+
+    <p class="hint" id="message" hidden></p>
+    <div id="providers"></div>
+  </div>
+
+  <script src="/static/icons.js"></script>
+  <script src="/static/format.js"></script>
+  <script src="/static/delete.js"></script>
+  <script src="/static/follow.js"></script>
+  <script>
+    let providers = [];
+
+    function message(text, error = false) {
+      const el = document.getElementById('message');
+      el.textContent = text;
+      el.hidden = !text;
+      el.style.color = error ? 'var(--error)' : '';
+    }
+
+    /* The ceiling on its own says nothing anybody can act on. What a round takes
+       does: it is the delay between a video being published and this instance
+       knowing about it, and it is what says whether following more is worth it. */
+    function figures(provider) {
+      const cells = [
+        ['Followed', `${provider.followed} of ${provider.limit}`],
+        ['In the queue', `${provider.slots} slot${provider.slots === 1 ? '' : 's'}`],
+        ['One full round', fmtRound(provider.round)],
+        ['Never read yet', provider.never],
+      ];
+      return cells.map(([label, value]) =>
+        `<div class="figure"><div class="figure-label">${label}</div>
+           <div class="figure-value">${esc(String(value))}</div></div>`).join('');
+    }
+
+    function render() {
+      document.getElementById('providers').innerHTML = providers.map(provider => `
+        <section class="follow-block">
+          <div class="feed-head">
+            <span>${esc(provider.label)}</span>
+            <span class="feed-head-actions">
+              <button class="link-btn" id="refresh-${provider.platform}"
+                ${provider.followed ? '' : 'hidden'}>Refresh all</button>
+            </span>
+          </div>
+          <div class="figures">${figures(provider)}</div>
+          <div class="feed-panel feed-add-panel">
+            <form class="feed-add" id="form-${provider.platform}">
+              <input id="url-${provider.platform}" type="url" required
+                     placeholder="${esc(provider.hint)}">
+              <button class="fetch-btn" id="submit-${provider.platform}">Add</button>
+            </form>
+            <label class="feed-import">
+              <span>Or import the ${esc(provider.file)}</span>
+              <input type="file" id="file-${provider.platform}" accept="${esc(provider.accept)}">
+            </label>
+            ${provider.items.length ? `<div class="channel-list">${followRows(provider.items)}</div>` : ''}
+          </div>
+        </section>`).join('');
+      providers.forEach(wireFollowing);
+    }
+
+    async function load() {
+      const res = await fetch('/api/following');
+      if (!res.ok) return;
+      providers = (await res.json()).providers;
+      render();
+    }
+
+    load();
+  </script>
+  <script src="/static/theme.js"></script>
+</body>
+</html>
