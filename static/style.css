@@ -92,6 +92,8 @@
   --success: #2d8a4e;
   --error: #c43d3d;
   --on-accent: #fff;
+  /* Red stays red in both themes, so this one is defined once. */
+  --on-error: #fff;
   --btn-hover: #2d2d2a;
   --accent-ring: rgba(232, 93, 42, 0.08);
   --fg-wash: rgba(26, 26, 24, 0.04);
@@ -473,7 +475,8 @@ textarea::placeholder { color: var(--muted); }
 .subscriptions { margin-top: 40px; }
 .channel-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; }
 .channel-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 10px 2px; border-bottom: 1px solid var(--card-border); font-size: .74rem; }
-.channel-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.channel-row > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.channel-actions { display: flex; gap: 6px; flex: 0 0 auto; }
 
 .history { margin-top: 40px; }
 .history-head {
@@ -964,6 +967,15 @@ audio.modal-media {
 }
 .icon-btn svg { width: 14px; height: 14px; }
 .icon-btn:hover { color: var(--fg); border-color: var(--card-border); }
+
+/* Armed by a first click: the next one deletes. Red is a state here, not a
+   hover, so it must beat the hover rules of both shapes. */
+.del-btn.armed,
+.del-btn.armed:hover {
+  background: var(--error);
+  border-color: var(--error);
+  color: var(--on-error);
+}
 .icon-btn.on { color: var(--accent); }
 .icon-btn.danger:hover { color: var(--error); border-color: var(--error-border); }
 

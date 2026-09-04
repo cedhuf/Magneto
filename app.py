@@ -850,7 +850,13 @@ def refresh_feed():
     the worker timeout waiting at the end of it.
     """
     owner = current_user()
-    channel_id = (request.json or {}).get("channel_id")
+    data = request.json or {}
+    channel_id = data.get("channel_id")
+    # One deliberate click on one channel, when the user knows a video is out.
+    # It skips the spacing rather than removing it: the lookup still takes the
+    # instance lock and still resets the clock the poller reads, so the
+    # automatic rate is unchanged afterwards.
+    force = bool(data.get("force"))
     with connect() as conn:
         row = conn.execute(
             "SELECT c.channel_url, c.refreshed_at FROM channels c "
@@ -860,9 +866,9 @@ def refresh_feed():
         return jsonify({"error": "Unknown channel"}), 404
     # Clicking twice must not cost two lookups, and a page full of channels must
     # not become a burst of them.
-    if time.time() - row["refreshed_at"] < FEED_COOLDOWN:
+    if not force and time.time() - row["refreshed_at"] < FEED_COOLDOWN:
         return jsonify({"ok": True, "skipped": "recent"})
-    if not channel_call_allowed():
+    if not force and not channel_call_allowed():
         return jsonify({"ok": True, "skipped": "busy"})
     try:
         refresh_channel(row["channel_url"], channel_id)

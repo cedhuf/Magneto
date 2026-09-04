@@ -12,7 +12,8 @@
     <div class="stats" id="stats"></div>
 
     <div class="controls admin-controls">
-      <button class="fetch-btn danger" id="purgeBtn" onclick="purgeAll()">Delete everything</button>
+      <button class="fetch-btn danger del-btn" id="purgeBtn" data-confirm="Confirm: delete everything"
+        onclick="if (armDelete(this)) { purgeAll() }">Delete everything</button>
       <span class="card-status" id="purgeMsg"></span>
     </div>
 
@@ -25,6 +26,7 @@
   </div>
 
   <script src="/static/format.js"></script>
+  <script src="/static/delete.js"></script>
   <script>
     function fmtSpan(s) {
       if (s <= 0) return 'gone';
@@ -70,7 +72,7 @@
           <td class="num">${e.bytes ? esc(fmtSize(e.bytes)) : '—'}</td>
           <td class="num">${esc(ago(e.created_at))}</td>
           <td class="num">${e.has_file ? esc(fmtSpan(e.expires_in)) : '—'}</td>
-          <td><button class="row-btn" onclick="removeEntry('${e.job_id}')">Delete</button></td>
+          <td>${deleteButton(`removeEntry('${e.job_id}')`)}</td>
         </tr>`).join('');
 
       document.getElementById('table').innerHTML = `
@@ -83,7 +85,6 @@
 
     async function purgeAll() {
       // Everyone's entries and everyone's files, not only this account's.
-      if (!confirm('Delete every entry and every file, for every user?')) return;
       const btn = document.getElementById('purgeBtn');
       const msg = document.getElementById('purgeMsg');
       btn.disabled = true;
@@ -100,7 +101,6 @@
     async function removeEntry(jobId) {
       // Deletes the file and the entry, so the owner loses it from their
       // history too. Maintenance, not tidying.
-      if (!confirm('Delete this file and its entry?')) return;
       await fetch(`/api/admin/entries/${jobId}`, { method: 'DELETE' });
       load();
     }

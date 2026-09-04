@@ -47,6 +47,7 @@
   <script src="/static/format.js"></script>
   <script src="/static/modal.js"></script>
   <script src="/static/card.js"></script>
+  <script src="/static/delete.js"></script>
   <script>
     let feedVideos = [];
     let feedChannels = [];
@@ -86,7 +87,13 @@
       document.getElementById('refreshBtn').hidden = empty;
       if (empty) document.getElementById('addPanel').hidden = false;
       const list = document.getElementById('channelList');
-      list.innerHTML = data.channels.map(c => `<div class="channel-row"><span>${esc(c.title)}</span><button class="row-btn" onclick="removeChannel('${esc(c.channel_id)}')">Remove</button></div>`).join('');
+      list.innerHTML = data.channels.map(c => `<div class="channel-row">
+        <span>${esc(c.title)}</span>
+        <span class="channel-actions">
+          <button class="row-btn" onclick="refreshChannel('${esc(c.channel_id)}', this)">Refresh</button>
+          ${deleteButton(`removeChannel('${esc(c.channel_id)}')`, {label: 'Remove'})}
+        </span>
+      </div>`).join('');
       document.getElementById('subscriptions').hidden = !data.channels.length;
     }
 
@@ -273,8 +280,28 @@
     }
 
     async function removeChannel(id) {
-      if (!confirm('Remove this channel from your feed?')) return;
       await fetch(`/api/feed/subscriptions/${encodeURIComponent(id)}`, {method: 'DELETE'}); load();
+    }
+
+    /* Refreshing one channel on purpose skips the spacing that Refresh feed
+       obeys: the user knows a video is out, and asking about every channel to
+       reach that one is what made the button useless. */
+    async function refreshChannel(id, button) {
+      button.disabled = true; button.textContent = 'Refreshing…';
+      try {
+        const res = await fetch('/api/feed/refresh', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({channel_id: id, force: true}),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'Could not refresh');
+        await load();
+        message('Channel refreshed.');
+      } catch (err) {
+        message(friendlyError(err.message), true);
+        button.disabled = false; button.textContent = 'Refresh';
+      }
     }
     initLayoutToggle(['videos'], 'layout.feed', 'grid');
     load();

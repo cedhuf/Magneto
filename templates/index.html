@@ -44,6 +44,7 @@
   <script src="/static/format.js"></script>
   <script src="/static/modal.js"></script>
   <script src="/static/card.js"></script>
+  <script src="/static/delete.js"></script>
   <script>
     let currentFormat = 'video';
     let cardData = [];
@@ -487,9 +488,7 @@
         ${canPin ? `<button class="icon-btn${c.pinned ? ' on' : ''}" onclick="togglePin(${idx})"
           title="${c.pinned ? 'Pinned, click to unpin' : 'Keep this one longer'}"
           aria-label="Pin">${pin}</button>` : ''}
-        <button class="icon-btn danger" onclick="removeCard(${idx})" title="Delete" aria-label="Delete">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
-        </button>
+        ${deleteButton(`removeCard(${idx})`, {icon: true})}
       </div>`;
     }
 
@@ -511,7 +510,6 @@
 
     async function removeCard(idx) {
       const c = cardData[idx];
-      if (!confirm('Delete this download and remove it from the list?')) return;
       try {
         await fetch(`/api/entries/${c.jobId}`, { method: 'DELETE' });
       } catch (err) {

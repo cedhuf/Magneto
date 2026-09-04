@@ -54,7 +54,9 @@ every channel at once and looks none of them up, so the poller fills them one at
 a time instead of asking YouTube a hundred times in one breath. **Settings** sets
 the quality and how many videos to keep per channel, for the whole feed rather
 than per video: a feed is read more than it is archived. **Refresh feed** updates
-one channel per request, so the wait is visible.
+one channel per request, so the wait is visible. Each channel in the list below
+has its own **Refresh**, which skips that spacing: it is one deliberate click on
+the channel you know has a new video, not a loop over all of them.
 
 Playing a feed video downloads it first, then plays the instance's own file.
 Nothing is embedded from YouTube.
