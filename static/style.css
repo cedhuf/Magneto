@@ -1002,11 +1002,12 @@ audio.modal-media {
   align-items: center;
 }
 /* The pages that manage their own accounts carry one more bar above the frame. */
-.shorts.manage { --chrome: 320px; }
+.shorts.manage { --chrome: 300px; }
 /* These two pages hold one thing, so they give it the room the other pages
    spend on the space around their lists. */
 .page:has(.shorts) { padding: 28px 24px 32px; }
 .page:has(.shorts) .brand { margin-bottom: 18px; }
+.page:has(.shorts) .feed-head { margin: 0 0 10px; }
 .shorts-frame {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1015,7 +1016,19 @@ audio.modal-media {
   /* 44 for the rail, 12 for the gap: the frame is the video plus its controls. */
   width: min(100%, calc(var(--stage) * 9 / 16 + 56px));
 }
-.shorts-media { grid-area: media; }
+.shorts-media { grid-area: media; position: relative; }
+/* Where the browser's controls would have been, and only where they are off. */
+.shorts-progress {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--scrim);
+  overflow: hidden;
+}
+.shorts-progress span { display: block; height: 100%; width: 0; background: var(--on-scrim); }
 /* Every clip gets the same rectangle, whatever it was filmed in. A clip that is
    not upright is shown whole against the frame rather than cropped into it:
    letterboxing reads as the video's shape, a crop reads as a bug. */

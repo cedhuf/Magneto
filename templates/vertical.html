@@ -15,14 +15,18 @@
     <div class="feed-head" id="feedHead">
       <span id="accountCount"></span>
       <span class="feed-head-actions">
-        <button class="link-btn" id="addBtn">Add accounts</button>
+        <button class="link-btn" id="addBtn">Accounts</button>
       </span>
     </div>
+    {# The list lives in the folded panel rather than under the player: on a page
+       whose whole point is one full-height video, a permanent block below it is
+       height taken from the video. #}
     <div class="feed-panel feed-add-panel" id="addPanel" hidden>
       <form class="feed-add" id="addForm">
         <input id="followUrl" type="url" placeholder="Paste a TikTok account URL…" required>
         <button class="fetch-btn" id="addSubmit">Add</button>
       </form>
+      <div class="channel-list" id="accountList"></div>
     </div>
     {% endif %}
 
@@ -48,12 +52,6 @@
       <p class="hint" id="message" hidden></p>
     </div>
 
-    {% if manage %}
-    <div class="subscriptions" id="accounts" hidden>
-      <div class="history-head">Accounts</div>
-      <div class="channel-list" id="accountList"></div>
-    </div>
-    {% endif %}
   </div>
 
   <script src="/static/icons.js"></script>
@@ -64,6 +62,11 @@
   <script>
     const FOLLOWED = {noun: 'Account', add: '/api/tiktok/accounts'};
     const SOURCE = {{ source | tojson }};
+    /* A touch screen has no hover, so the browser shows its own controls on
+       every new clip and leaves them there for seconds. On a clip that lasts
+       ten, that is most of it. There, the video is read with a tap and a line
+       says where it is. */
+    const TAP = matchMedia('(hover: none)').matches;
     const MANAGE = {{ manage | tojson }};
     let clips = [];
     let accounts = [];
@@ -113,15 +116,25 @@
         : '';
       media.innerHTML = clip.job_id
         ? `<video class="shorts-video" src="/api/stream/${encodeURIComponent(clip.job_id)}"
-             controls autoplay playsinline></video>`
+             ${TAP ? '' : 'controls'} autoplay playsinline></video>`
+          + (TAP ? '<div class="shorts-progress"><span id="played"></span></div>' : '')
         : `<div class="shorts-poster">
              ${clip.thumbnail ? `<img src="${esc(clip.thumbnail)}" alt="">` : ''}
              <span class="shorts-note" id="note">Fetching…</span>
            </div>`;
+      if (clip.job_id && TAP) wireTap(media.querySelector('video'));
       if (!clip.job_id) fetchClip(at, true);
       // One ahead, so the next flick does not wait on a download. Never more:
       // every extra one is a video nobody has asked to watch.
       if (clips[at + 1] && !clips[at + 1].job_id) fetchClip(at + 1, false);
+    }
+
+    function wireTap(video) {
+      video.addEventListener('click', () => video.paused ? video.play() : video.pause());
+      video.addEventListener('timeupdate', () => {
+        const bar = document.getElementById('played');
+        if (bar && video.duration) bar.style.width = `${video.currentTime / video.duration * 100}%`;
+      });
     }
 
     async function fetchClip(index, showing) {
@@ -200,7 +213,6 @@
         ? `${clips.length} clip${clips.length === 1 ? '' : 's'} from ${accounts.length} account${accounts.length === 1 ? '' : 's'}`
         : 'No accounts yet';
       if (!accounts.length) document.getElementById('addPanel').hidden = false;
-      document.getElementById('accounts').hidden = !accounts.length;
       document.getElementById('accountList').innerHTML = followRows(accounts);
     }
 
