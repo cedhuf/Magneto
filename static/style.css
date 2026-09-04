@@ -995,14 +995,14 @@ audio.modal-media {
    That single number is --stage: the height the video may take once the
    header, the caption and the page's own margins have had theirs. */
 .shorts {
-  --chrome: 290px;
+  --chrome: 225px;
   --stage: clamp(360px, calc(100dvh - var(--chrome)), 900px);
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 /* The pages that manage their own accounts carry one more bar above the frame. */
-.shorts.manage { --chrome: 350px; }
+.shorts.manage { --chrome: 285px; }
 /* Only the bottom margin is given back to the video. Everything above the frame
    keeps the spacing of every other page, or the header would sit at a different
    height here and move as you walk between the tabs. */
@@ -1010,7 +1010,10 @@ audio.modal-media {
 .shorts-frame {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: "media rail" "caption caption";
+  /* The caption shares the video's cell rather than taking a row of its own:
+     read over the image, it costs no height, which is the height the video
+     wanted. */
+  grid-template-areas: "media rail";
   gap: 12px;
   /* 44 for the rail, 12 for the gap: the frame is the video plus its controls. */
   width: min(100%, calc(var(--stage) * 9 / 16 + 56px));
@@ -1038,11 +1041,10 @@ audio.modal-media {
 /* Where the browser's controls would have been, and only where they are off. */
 .shorts-progress {
   position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 10px;
+  left: 0;
+  right: 0;
+  bottom: 0;
   height: 3px;
-  border-radius: 2px;
   background: var(--scrim);
   overflow: hidden;
 }
@@ -1110,24 +1112,43 @@ audio.modal-media {
   border-color: var(--error);
   color: var(--on-error);
 }
-.shorts-caption { grid-area: caption; }
+.shorts-caption {
+  grid-area: media;
+  align-self: end;
+  z-index: 1;
+  padding: 40px 14px 12px;
+  border-radius: 0 0 var(--radius) var(--radius);
+  background: linear-gradient(to top, var(--scrim-strong), transparent);
+  color: var(--on-scrim);
+  /* A tap on the words is a tap on the video, which is what pauses it. */
+  pointer-events: none;
+}
+/* Where a pointer summons the browser's own controls, the caption sits above
+   the bar they draw instead of underneath it. */
+@media (hover: hover) {
+  .shorts-caption { padding-bottom: 46px; }
+}
 .shorts-title {
   font-family: 'Instrument Serif', serif;
-  font-size: 1.1rem;
-  line-height: 1.3;
-  color: var(--fg);
+  font-size: 0.95rem;
+  line-height: 1.35;
+  /* Two lines of a title, never a wall of hashtags. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .shorts-meta {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 4px;
-  font-size: 0.68rem;
-  color: var(--muted);
-  letter-spacing: 0.03em;
+  margin-top: 3px;
+  font-size: 0.6rem;
+  opacity: 0.8;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.shorts-meta svg { width: 14px; height: 14px; flex: 0 0 auto; }
+.shorts-meta svg { width: 12px; height: 12px; flex: 0 0 auto; }
 
 /* Cut into the page rather than laid on it: the page's own background, an inner
    shadow for the depth and a hairline below for the lit edge. */
