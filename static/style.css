@@ -1031,12 +1031,9 @@ audio.modal-media {
   text-align: left;
   width: 100%;
   cursor: pointer;
-  /* Not font: inherit, which would take the body's monospace: a title stays a
-     title whether it is a div or a button. */
-  font-family: inherit;
-  font-size: inherit;
-  line-height: inherit;
-  color: inherit;
+  /* No font declaration at all. The element carries .card-title, so it is
+     styled by that rule; inheriting here would take the body's monospace from
+     the parent and beat it on specificity. */
 }
 .card-title.as-text:hover { color: var(--accent); }
 
