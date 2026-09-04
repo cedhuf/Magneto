@@ -25,14 +25,11 @@ function thumbMarkup({ thumbnail, badges, play, alt = '' }) {
 /* Every section is optional, which is what lets one function serve a queue row
    and a feed tile without either growing a special case. */
 function mediaCardMarkup({ id, thumbnail, alt, badges, play, title, meta,
-                           note, chips, actions, onTitle, className = '' }) {
-  const heading = onTitle
-    ? `<button class="card-title as-text" onclick="${onTitle}">${esc(title)}</button>`
-    : `<div class="card-title">${esc(title)}</div>`;
+                           note, chips, actions, className = '' }) {
   return `<div class="card ${className}"${id ? ` id="${id}"` : ''}>
     ${thumbMarkup({ thumbnail, badges, play, alt })}
     <div class="card-body">
-      ${heading}
+      <div class="card-title">${esc(title)}</div>
       ${meta ? `<div class="card-meta">${meta}</div>` : ''}
       ${note ? `<div class="card-note-row">${note}</div>` : ''}
       ${chips ? `<div class="card-chips">${chips}</div>` : ''}

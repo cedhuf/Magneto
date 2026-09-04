@@ -65,9 +65,8 @@
                  v.ready ? {text: 'Ready', place: 'start ready'} : null],
         play: `playVideo(${i})`,
         title: v.title,
-        onTitle: `openVideo(${i})`,
-        meta: [esc(v.channel), fmtDate(v.upload_date)].filter(Boolean).join(' \u00b7 '),
-        actions: `<button class="card-dl-btn" onclick="saveVideo(${i})">${
+        meta: [esc(v.uploader), fmtDate(v.upload_date)].filter(Boolean).join(' \u00b7 '),
+        actions: `<button class="card-dl-btn" id="save-${i}" onclick="saveVideo(${i})">${
           v.ready ? 'Save' : 'Download'}</button>`,
       })).join('');
       document.getElementById('feedHead').hidden = !data.channels.length;
@@ -160,28 +159,8 @@
       button.textContent = 'Refresh feed';
     });
     /* Playing means downloading first, then using the app's own player on the
-       app's own file. The previous version embedded a YouTube iframe, which
-       sent every viewer straight back to YouTube. */
-    function videoSheet(video, media, actions) {
-      openModal({
-        title: video.title,
-        meta: [video.channel, fmtDate(video.upload_date), fmtDur(video.duration)]
-          .filter(Boolean).join(' \u00b7 '),
-        description: video.description || '',
-        media,
-        actions,
-      });
-    }
-
-    function openVideo(index) {
-      const video = feedVideos[index];
-      videoSheet(video,
-        posterMarkup(video.thumbnail, video.ready ? 'On the server' : 'Not downloaded yet'),
-        `<button class="card-dl-btn" onclick="playVideo(${index})">Play</button>
-         <button class="card-dl-btn" onclick="saveVideo(${index})">${
-           video.ready ? 'Save' : 'Download'}</button>`);
-    }
-
+       app's own file. Never a YouTube embed: downloading first is what keeps
+       the viewer on the instance. */
     async function startDownload(video) {
       const res = await fetch('/api/download', {
         method: 'POST',
@@ -192,7 +171,7 @@
           max_height: feedSettings.quality,
           title: video.title,
           thumbnail: video.thumbnail,
-          uploader: video.channel,
+          uploader: video.uploader,
           upload_date: video.upload_date,
           description: video.description || '',
         }),
@@ -215,36 +194,38 @@
       });
     }
 
-    async function playVideo(index) {
-      const video = feedVideos[index];
-      videoSheet(video, posterMarkup(video.thumbnail, 'Preparing\u2026'), '');
+    /* Progress belongs on the card, as on the home page: the modal opens once
+       there is something to play. */
+    async function prepare(index, label) {
+      const button = document.getElementById(`save-${index}`);
+      const previous = button ? button.textContent : '';
+      if (button) { button.textContent = label; button.disabled = true; }
       try {
-        const jobId = await startDownload(video);
+        const jobId = await startDownload(feedVideos[index]);
         const done = await waitForFile(jobId);
-        videoSheet(video, mediaMarkup(jobId, done.filename),
-          `<a class="card-dl-btn" href="/api/file/${jobId}" download>Save</a>`);
-      } catch (err) {
-        videoSheet(video, posterMarkup(video.thumbnail, friendlyError(err.message)),
-          `<button class="card-dl-btn" onclick="playVideo(${index})">Try again</button>`);
+        feedVideos[index].ready = true;
+        return {jobId, filename: done.filename};
+      } finally {
+        if (button) { button.textContent = previous; button.disabled = false; }
       }
     }
 
-    async function saveVideo(index) {
-      const video = feedVideos[index];
-      videoSheet(video, posterMarkup(video.thumbnail, 'Downloading\u2026'), '');
+    async function playVideo(index) {
       try {
-        const jobId = await startDownload(video);
-        const done = await waitForFile(jobId);
+        const file = await prepare(index, 'Preparing\u2026');
+        openPlayer({...feedVideos[index], ...file});
+      } catch (err) { message(friendlyError(err.message), true); }
+    }
+
+    async function saveVideo(index) {
+      try {
+        const file = await prepare(index, 'Downloading\u2026');
         const a = document.createElement('a');
-        a.href = `/api/file/${jobId}`;
-        a.download = done.filename || '';
+        a.href = `/api/file/${file.jobId}`;
+        a.download = file.filename || '';
         a.click();
-        videoSheet(video, posterMarkup(video.thumbnail, 'Saved'),
-          `<button class="card-dl-btn" onclick="playVideo(${index})">Play</button>`);
-      } catch (err) {
-        videoSheet(video, posterMarkup(video.thumbnail, friendlyError(err.message)),
-          `<button class="card-dl-btn" onclick="saveVideo(${index})">Try again</button>`);
-      }
+        message('Saved.');
+      } catch (err) { message(friendlyError(err.message), true); }
     }
 
     async function removeChannel(id) {

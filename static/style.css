@@ -610,8 +610,7 @@ textarea::placeholder { color: var(--muted); }
 }
 .modal-close:hover { background: var(--scrim-strong); }
 .modal-close svg { width: 16px; height: 16px; }
-.modal-media,
-.modal-poster {
+.modal-media {
   display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
@@ -622,25 +621,6 @@ audio.modal-media {
   background: transparent;
   padding: 20px 20px 0;
   width: calc(100% - 40px);
-}
-.modal-poster { position: relative; }
-.modal-poster img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  opacity: 0.5;
-}
-.modal-poster-note {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--on-scrim);
-  font-size: 0.72rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 .modal-body { padding: 18px 20px 22px; }
 .modal-title {
@@ -656,17 +636,6 @@ audio.modal-media {
   letter-spacing: 0.03em;
   text-transform: uppercase;
 }
-.modal-desc {
-  margin: 14px 0 0;
-  max-height: 180px;
-  overflow-y: auto;
-  color: var(--muted);
-  font-size: 0.72rem;
-  line-height: 1.55;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.modal-actions { margin-top: 18px; display: flex; gap: 8px; align-items: center; }
 
 /* Shimmer skeleton for loading state */
 .card-thumb.loading {
@@ -1022,20 +991,6 @@ audio.modal-media {
   color: var(--error);
   font-weight: 500;
 }
-
-/* A title that opens something is a button, and must not look like one. */
-.card-title.as-text {
-  border: none;
-  background: none;
-  padding: 0;
-  text-align: left;
-  width: 100%;
-  cursor: pointer;
-  /* No font declaration at all. The element carries .card-title, so it is
-     styled by that rule; inheriting here would take the body's monospace from
-     the parent and beat it on specificity. */
-}
-.card-title.as-text:hover { color: var(--accent); }
 
 /* A file already on the server: the badge is the difference between pressing
    play and waiting for a download. */

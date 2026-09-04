@@ -24,9 +24,9 @@ function onModalKey(e) {
   if (e.key === 'Escape') closeModal();
 }
 
-/* media, actions and description are optional HTML fragments, so the same
-   shell serves a bare player and a full video sheet. */
-function openModal({ title = '', meta = '', description = '', media = '', actions = '' }) {
+/* The shell: a media slot, a title, a line of metadata. Both pages open it
+   through openPlayer below. */
+function openModal({ title = '', meta = '', media = '' }) {
   closeModal();
   const overlay = document.createElement('div');
   overlay.className = 'modal';
@@ -39,8 +39,6 @@ function openModal({ title = '', meta = '', description = '', media = '', action
       <div class="modal-body">
         ${title ? `<h2 class="modal-title">${esc(title)}</h2>` : ''}
         ${meta ? `<div class="modal-meta">${esc(meta)}</div>` : ''}
-        ${description ? `<p class="modal-desc">${esc(description)}</p>` : ''}
-        ${actions ? `<div class="modal-actions">${actions}</div>` : ''}
       </div>
     </div>`;
   overlay.addEventListener('click', e => {
@@ -62,9 +60,13 @@ function mediaMarkup(jobId, filename) {
            controls autoplay playsinline></${tag}>`;
 }
 
-function posterMarkup(thumbnail, label) {
-  return `<div class="modal-poster">
-      ${thumbnail ? `<img src="${esc(thumbnail)}" alt="">` : ''}
-      <div class="modal-poster-note">${esc(label)}</div>
-    </div>`;
+/* The player, identical on both pages: the file, its title, one line of
+   metadata. A card and a feed video carry the same field names, so both pass
+   themselves. */
+function openPlayer({ title, filename, uploader, duration, upload_date, jobId }) {
+  openModal({
+    title: title || filename || '',
+    meta: [uploader, fmtDur(duration), fmtDate(upload_date)].filter(Boolean).join(' \u00b7 '),
+    media: mediaMarkup(jobId, filename),
+  });
 }

@@ -720,7 +720,7 @@ def feed():
         # display choice, so changing it needs no lookup at all.
         channel["videos"] = json.loads(channel["videos"])[:settings["videos"]]
         channels.append(channel)
-        videos.extend({**video, "channel": row["title"], "channel_id": row["channel_id"],
+        videos.extend({**video, "uploader": row["title"], "channel_id": row["channel_id"],
                        "ready": video["url"] in ready}
                       for video in channel["videos"])
     # YYYYMMDD sorts correctly as a string. Unknown dates naturally sink.

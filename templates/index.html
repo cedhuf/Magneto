@@ -432,7 +432,7 @@
             // Downloads folder; the Save button stays available for that.
             if (c.playWhenDone) {
               c.playWhenDone = false;
-              openPlayer(idx);
+              openPlayer(cardData[idx]);
             } else {
               saveCard(idx);
             }
@@ -606,21 +606,13 @@
     function playCard(idx) {
       const c = cardData[idx];
       if (c.status === 'done') {
-        openPlayer(idx);
+        openPlayer(cardData[idx]);
       } else if (c.status !== 'downloading') {
         c.playWhenDone = true;
         dlCard(idx);
       }
     }
 
-    function openPlayer(idx) {
-      const c = cardData[idx];
-      openModal({
-        title: c.title || c.filename || '',
-        meta: [c.uploader, fmtDur(c.duration), fmtDate(c.upload_date)].filter(Boolean).join(' · '),
-        media: mediaMarkup(c.jobId, c.filename),
-      });
-    }
   </script>
   <script src="/static/theme.js"></script>
 </body>
