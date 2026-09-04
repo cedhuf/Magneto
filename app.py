@@ -121,6 +121,28 @@ MIGRATIONS = [
         feed_quality INTEGER NOT NULL
     );
     """,
+    """
+    CREATE TABLE channels (
+        channel_id   TEXT PRIMARY KEY,
+        channel_url  TEXT NOT NULL,
+        title        TEXT,
+        thumbnail    TEXT,
+        videos       TEXT NOT NULL DEFAULT '[]',
+        refreshed_at REAL NOT NULL DEFAULT 0
+    );
+    INSERT OR IGNORE INTO channels
+        (channel_id, channel_url, title, thumbnail, videos, refreshed_at)
+        SELECT channel_id, channel_url, title, thumbnail, videos, refreshed_at
+        FROM subscriptions;
+    CREATE TABLE follows (
+        owner      TEXT NOT NULL,
+        channel_id TEXT NOT NULL,
+        PRIMARY KEY (owner, channel_id)
+    );
+    INSERT OR IGNORE INTO follows (owner, channel_id)
+        SELECT owner, channel_id FROM subscriptions;
+    DROP TABLE subscriptions;
+    """,
 ]
 
 
@@ -323,10 +345,12 @@ def trim_history():
 
 
 def stalest_channel():
+    """The oldest channel somebody still follows."""
     with connect() as conn:
         return conn.execute(
-            "SELECT owner, channel_url FROM subscriptions "
-            "WHERE refreshed_at < ? ORDER BY refreshed_at LIMIT 1",
+            "SELECT c.channel_id, c.channel_url FROM channels c "
+            "JOIN follows f ON f.channel_id = c.channel_id "
+            "WHERE c.refreshed_at < ? ORDER BY c.refreshed_at LIMIT 1",
             (time.time() - FEED_TTL,)).fetchone()
 
 
@@ -342,7 +366,7 @@ def feed_poller():
         try:
             row = stalest_channel()
             if row:
-                refresh_subscription(row["owner"], row["channel_url"])
+                refresh_channel(row["channel_url"], row["channel_id"])
         except Exception as e:
             app.logger.warning("feed refresh failed: %s", e)
 
@@ -570,28 +594,35 @@ def fetch_channel(url, known=None, count=None):
     }
 
 
-def refresh_subscription(owner, url, channel_id=None):
+def refresh_channel(url, channel_id=None):
+    """Look a channel up once, for everyone who follows it.
+
+    The cache is keyed by channel, not by subscriber: with the outbound rate
+    capped instance-wide, storing it per account would have spent that budget
+    as many times as there are people following the same channel, which in a
+    household is the common case rather than the edge one. It holds the
+    instance maximum; each account displays as many as it asked for.
+    """
     global last_channel_call
     known = {}
     if channel_id:
         with connect() as conn:
-            row = conn.execute("SELECT videos FROM subscriptions "
-                               "WHERE owner = ? AND channel_id = ?",
-                               (owner, channel_id)).fetchone()
+            row = conn.execute("SELECT videos FROM channels WHERE channel_id = ?",
+                               (channel_id,)).fetchone()
         if row:
             known = {v["id"]: v for v in json.loads(row["videos"]) if v.get("id")}
     with feed_lock:
         last_channel_call = time.time()
-        channel = fetch_channel(url, known, get_settings(owner)["videos"])
+        channel = fetch_channel(url, known, FEED_VIDEOS_MAX)
     with connect() as conn:
-        conn.execute("INSERT INTO subscriptions "
-                     "(owner, channel_id, channel_url, title, thumbnail, videos, refreshed_at) "
-                     "VALUES (?, ?, ?, ?, ?, ?, ?) "
-                     "ON CONFLICT(owner, channel_id) DO UPDATE SET "
+        conn.execute("INSERT INTO channels "
+                     "(channel_id, channel_url, title, thumbnail, videos, refreshed_at) "
+                     "VALUES (?, ?, ?, ?, ?, ?) "
+                     "ON CONFLICT(channel_id) DO UPDATE SET "
                      "channel_url = excluded.channel_url, title = excluded.title, "
                      "thumbnail = excluded.thumbnail, videos = excluded.videos, "
                      "refreshed_at = excluded.refreshed_at",
-                     (owner, channel["channel_id"], channel["channel_url"], channel["title"],
+                     (channel["channel_id"], channel["channel_url"], channel["title"],
                       channel["thumbnail"], json.dumps(channel["videos"]), time.time()))
     return channel
 
@@ -616,21 +647,25 @@ def feed_page():
 @app.route("/api/feed")
 def feed():
     owner = current_user()
+    settings = get_settings(owner)
     with connect() as conn:
-        rows = conn.execute("SELECT * FROM subscriptions WHERE owner = ? "
-                            "ORDER BY title COLLATE NOCASE", (owner,)).fetchall()
+        rows = conn.execute(
+            "SELECT c.* FROM channels c JOIN follows f ON f.channel_id = c.channel_id "
+            "WHERE f.owner = ? ORDER BY c.title COLLATE NOCASE", (owner,)).fetchall()
     channels = []
     videos = []
     for row in rows:
         channel = dict(row)
-        channel["videos"] = json.loads(channel["videos"])
+        # The cache holds the instance maximum; the account's own count is a
+        # display choice, so changing it needs no lookup at all.
+        channel["videos"] = json.loads(channel["videos"])[:settings["videos"]]
         channels.append(channel)
         videos.extend({**video, "channel": row["title"], "channel_id": row["channel_id"]}
                       for video in channel["videos"])
     # YYYYMMDD sorts correctly as a string. Unknown dates naturally sink.
     videos.sort(key=lambda video: video["upload_date"], reverse=True)
     return jsonify({"channels": channels, "videos": videos,
-                    "settings": get_settings(owner),
+                    "settings": settings,
                     "limits": {"videos_max": FEED_VIDEOS_MAX,
                                "qualities": FEED_QUALITIES}})
 
@@ -655,16 +690,20 @@ def subscribe():
     if not is_safe_url(url) or not youtube_videos_url(url):
         return jsonify({"error": "Please enter a YouTube channel URL"}), 400
     with connect() as conn:
-        followed = conn.execute("SELECT count(*) FROM subscriptions WHERE owner = ?",
+        followed = conn.execute("SELECT count(*) FROM follows WHERE owner = ?",
                                 (owner,)).fetchone()[0]
     if followed >= FEED_CHANNELS_MAX:
         return jsonify({"error": f"At most {FEED_CHANNELS_MAX} channels"}), 400
     try:
-        return jsonify(refresh_subscription(owner, url))
+        channel = refresh_channel(url)
     except subprocess.TimeoutExpired:
         return jsonify({"error": "Timed out fetching channel"}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+    with connect() as conn:
+        conn.execute("INSERT OR IGNORE INTO follows (owner, channel_id) VALUES (?, ?)",
+                     (owner, channel["channel_id"]))
+    return jsonify(channel)
 
 
 @app.route("/api/feed/refresh", methods=["POST"])
@@ -678,9 +717,10 @@ def refresh_feed():
     owner = current_user()
     channel_id = (request.json or {}).get("channel_id")
     with connect() as conn:
-        row = conn.execute("SELECT channel_url, refreshed_at FROM subscriptions "
-                           "WHERE owner = ? AND channel_id = ?",
-                           (owner, channel_id)).fetchone()
+        row = conn.execute(
+            "SELECT c.channel_url, c.refreshed_at FROM channels c "
+            "JOIN follows f ON f.channel_id = c.channel_id "
+            "WHERE f.owner = ? AND c.channel_id = ?", (owner, channel_id)).fetchone()
     if row is None:
         return jsonify({"error": "Unknown channel"}), 404
     # Clicking twice must not cost two lookups, and a page full of channels must
@@ -690,7 +730,7 @@ def refresh_feed():
     if not channel_call_allowed():
         return jsonify({"ok": True, "skipped": "busy"})
     try:
-        refresh_subscription(owner, row["channel_url"], channel_id)
+        refresh_channel(row["channel_url"], channel_id)
         return jsonify({"ok": True})
     except subprocess.TimeoutExpired:
         return jsonify({"error": "Timed out"}), 400
@@ -701,8 +741,12 @@ def refresh_feed():
 @app.route("/api/feed/subscriptions/<channel_id>", methods=["DELETE"])
 def unsubscribe(channel_id):
     with connect() as conn:
-        conn.execute("DELETE FROM subscriptions WHERE owner = ? AND channel_id = ?",
+        conn.execute("DELETE FROM follows WHERE owner = ? AND channel_id = ?",
                      (current_user(), channel_id))
+        # A channel nobody follows any more stops being refreshed, and stops
+        # taking space.
+        conn.execute("DELETE FROM channels WHERE channel_id NOT IN "
+                     "(SELECT channel_id FROM follows)")
     return jsonify({"ok": True})
 
 

@@ -104,10 +104,10 @@
       }
       feedSettings = await res.json();
       renderSettings();
-      // The count changes what a channel holds, so it only shows after a refresh.
-      message(key === 'videos'
-        ? 'Saved. Refresh the feed to apply the new count.'
-        : 'Saved.');
+      // The cache holds the instance maximum, so a new count is a slice of what
+      // is already there: no lookup, no refresh.
+      if (key === 'videos') await load();
+      message('Saved.');
     }
 
     document.getElementById('settingsBtn').addEventListener('click', () => {

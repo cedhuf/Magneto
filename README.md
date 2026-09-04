@@ -59,7 +59,10 @@ Nothing is embedded from YouTube.
 ### Staying welcome at YouTube
 
 Every subscription of every user leaves from one IP, so the limits are
-instance-wide rather than per account. A background thread refreshes the single
+instance-wide rather than per account. The cache is keyed by channel and shared
+by everyone following it: two people following the same channel cost one
+lookup, not two. It holds `RECLIP_FEED_VIDEOS` videos and each account displays
+as many as it chose, so changing that number costs nothing. A background thread refreshes the single
 stalest channel every `RECLIP_FEED_POLL`, and only if its copy is older than
 `RECLIP_FEED_TTL`: the outbound rate is therefore capped no matter how many
 users or channels there are. A manual refresh obeys the same spacing and skips
