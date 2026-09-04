@@ -36,7 +36,7 @@
         <span class="pill-group" id="countPills"></span>
       </label>
     </div>
-    <p class="hint" id="message">Add a channel to see its latest videos.</p>
+    <p class="hint" id="message" hidden></p>
     <div class="cards grid" id="videos"></div>
     <div class="subscriptions" id="subscriptions" hidden>
       <div class="history-head">Channels</div>
@@ -54,7 +54,14 @@
     let feedChannels = [];
     let feedSettings = {videos: 3, quality: 720};
     let feedLimits = {videos_max: 5, qualities: [720]};
-    function message(text, error = false) { const el = document.getElementById('message'); el.textContent = text; el.style.color = error ? 'var(--error)' : ''; }
+    /* The bar above already says when there is nothing yet, so this line only
+       exists while it has something to report, and takes no room otherwise. */
+    function message(text, error = false) {
+      const el = document.getElementById('message');
+      el.textContent = text;
+      el.hidden = !text;
+      el.style.color = error ? 'var(--error)' : '';
+    }
 
     async function load() {
       const res = await fetch('/api/feed');
