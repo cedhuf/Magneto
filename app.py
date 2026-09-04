@@ -66,6 +66,10 @@ def connect():
     return conn
 
 
+# Append only. A version number is a position in this list, so inserting one in
+# the middle rewrites the past of every database already migrated: it replays a
+# different script under a number they have already recorded. Adding settings
+# above subscriptions did exactly that and crashed the container on import.
 MIGRATIONS = [
     """
     CREATE TABLE entries (
@@ -99,13 +103,6 @@ MIGRATIONS = [
     ALTER TABLE entries ADD COLUMN upload_date TEXT;
     """,
     """
-    CREATE TABLE settings (
-        owner        TEXT PRIMARY KEY,
-        feed_videos  INTEGER NOT NULL,
-        feed_quality INTEGER NOT NULL
-    );
-    """,
-    """
     CREATE TABLE subscriptions (
         owner        TEXT NOT NULL,
         channel_id   TEXT NOT NULL,
@@ -115,6 +112,13 @@ MIGRATIONS = [
         videos       TEXT NOT NULL DEFAULT '[]',
         refreshed_at REAL NOT NULL DEFAULT 0,
         PRIMARY KEY (owner, channel_id)
+    );
+    """,
+    """
+    CREATE TABLE settings (
+        owner        TEXT PRIMARY KEY,
+        feed_videos  INTEGER NOT NULL,
+        feed_quality INTEGER NOT NULL
     );
     """,
 ]
