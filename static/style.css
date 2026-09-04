@@ -1035,3 +1035,10 @@ audio.modal-media {
   color: inherit;
 }
 .card-title.as-text:hover { color: var(--accent); }
+
+/* A file already on the server: the badge is the difference between pressing
+   play and waiting for a download. */
+.thumb-badge.ready {
+  background: var(--accent);
+  color: var(--on-accent);
+}

@@ -62,12 +62,13 @@
         thumbnail: v.thumbnail,
         alt: v.title,
         badges: [{text: fmtDur(v.duration), place: 'end'},
-                 {text: fmtDate(v.upload_date), place: 'start'}],
+                 v.ready ? {text: 'Ready', place: 'start ready'} : null],
         play: `playVideo(${i})`,
         title: v.title,
         onTitle: `openVideo(${i})`,
-        meta: esc(v.channel),
-        actions: `<button class="card-dl-btn" onclick="saveVideo(${i})">Download</button>`,
+        meta: [esc(v.channel), fmtDate(v.upload_date)].filter(Boolean).join(' \u00b7 '),
+        actions: `<button class="card-dl-btn" onclick="saveVideo(${i})">${
+          v.ready ? 'Save' : 'Download'}</button>`,
       })).join('');
       document.getElementById('feedHead').hidden = !data.channels.length;
       document.getElementById('videoCount').textContent = `${data.videos.length} latest video${data.videos.length === 1 ? '' : 's'}`;
@@ -174,9 +175,11 @@
 
     function openVideo(index) {
       const video = feedVideos[index];
-      videoSheet(video, posterMarkup(video.thumbnail, 'Not downloaded yet'),
+      videoSheet(video,
+        posterMarkup(video.thumbnail, video.ready ? 'On the server' : 'Not downloaded yet'),
         `<button class="card-dl-btn" onclick="playVideo(${index})">Play</button>
-         <button class="card-dl-btn" onclick="saveVideo(${index})">Download</button>`);
+         <button class="card-dl-btn" onclick="saveVideo(${index})">${
+           video.ready ? 'Save' : 'Download'}</button>`);
     }
 
     async function startDownload(video) {

@@ -703,6 +703,15 @@ def feed():
         rows = conn.execute(
             "SELECT c.* FROM channels c JOIN follows f ON f.channel_id = c.channel_id "
             "WHERE f.owner = ? ORDER BY c.title COLLATE NOCASE", (owner,)).fetchall()
+    # What Play would reuse rather than download, in this account's quality.
+    # Files are shared, so a video someone else already fetched is ready here
+    # too: saying so is the difference between an instant play and a wait.
+    variant = variant_of("video", None, settings["quality"])
+    with connect() as conn:
+        ready = {r["url"] for r in conn.execute(
+            "SELECT url, path FROM entries WHERE variant = ? AND status = 'done' "
+            "AND path IS NOT NULL", (variant,)) if os.path.exists(r["path"])}
+
     channels = []
     videos = []
     for row in rows:
@@ -711,7 +720,8 @@ def feed():
         # display choice, so changing it needs no lookup at all.
         channel["videos"] = json.loads(channel["videos"])[:settings["videos"]]
         channels.append(channel)
-        videos.extend({**video, "channel": row["title"], "channel_id": row["channel_id"]}
+        videos.extend({**video, "channel": row["title"], "channel_id": row["channel_id"],
+                       "ready": video["url"] in ready}
                       for video in channel["videos"])
     # YYYYMMDD sorts correctly as a string. Unknown dates naturally sink.
     videos.sort(key=lambda video: video["upload_date"], reverse=True)
