@@ -17,7 +17,18 @@
 
     <div class="feed-head" id="feedHead" hidden>
       <span id="videoCount"></span>
-      <button class="link-btn" id="refreshBtn">Refresh feed</button>
+      <span class="feed-head-actions">
+        <button class="link-btn" id="settingsBtn">Settings</button>
+        <button class="link-btn" id="refreshBtn">Refresh feed</button>
+      </span>
+    </div>
+    <div class="feed-settings" id="settings" hidden>
+      <label>Quality
+        <span class="pill-group" id="qualityPills"></span>
+      </label>
+      <label>Videos per channel
+        <span class="pill-group" id="countPills"></span>
+      </label>
     </div>
     <div class="feed-grid" id="videos"></div>
     <div class="subscriptions" id="subscriptions" hidden>
@@ -25,19 +36,14 @@
       <div class="channel-list" id="channelList"></div>
     </div>
   </div>
-  <div class="feed-modal" id="modal" hidden>
-    <div class="feed-modal-box" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <button class="player-close feed-modal-close" onclick="closeVideo()" aria-label="Close">×</button>
-      <div id="modalMedia"></div>
-      <div class="feed-modal-body"><h2 id="modalTitle"></h2><div id="modalMeta" class="feed-video-meta"></div><p id="modalDescription"></p>
-        <a class="card-dl-btn" id="downloadLink">Download</a></div>
-    </div>
-  </div>
 
   <script src="/static/format.js"></script>
+  <script src="/static/modal.js"></script>
   <script>
     let feedVideos = [];
     let feedChannels = [];
+    let feedSettings = {videos: 3, quality: 720};
+    let feedLimits = {videos_max: 5, qualities: [720]};
     function message(text, error = false) { const el = document.getElementById('message'); el.textContent = text; el.style.color = error ? 'var(--error)' : ''; }
 
     async function load() {
@@ -46,6 +52,9 @@
       const data = await res.json();
       feedVideos = data.videos;
       feedChannels = data.channels;
+      feedSettings = data.settings;
+      feedLimits = data.limits;
+      renderSettings();
       const videos = document.getElementById('videos');
       videos.innerHTML = data.videos.map((v, i) => `<button class="feed-video" type="button" onclick="openVideo(${i})">
         <div class="feed-thumb">${v.thumbnail ? `<img src="${esc(v.thumbnail)}" alt="">` : ''}${fmtDate(v.upload_date) ? `<span class="feed-date">${fmtDate(v.upload_date)}</span>` : ''}${v.duration ? `<span class="feed-duration">${fmtDur(v.duration)}</span>` : ''}</div>
@@ -58,6 +67,45 @@
       list.innerHTML = data.channels.map(c => `<div class="channel-row"><span>${esc(c.title)}</span><button class="row-btn" onclick="removeChannel('${esc(c.channel_id)}')">Remove</button></div>`).join('');
       document.getElementById('subscriptions').hidden = !data.channels.length;
     }
+
+    /* One setting for the whole feed: it is a reading surface, so a quality is
+       chosen once rather than per video like on the downloader. */
+    function renderSettings() {
+      document.getElementById('qualityPills').innerHTML = feedLimits.qualities.map(q =>
+        `<button class="pill${q === feedSettings.quality ? ' active' : ''}"
+          onclick="setSetting('quality', ${q})">${q}p</button>`).join('');
+      const counts = Array.from({length: feedLimits.videos_max}, (_, i) => i + 1);
+      document.getElementById('countPills').innerHTML = counts.map(n =>
+        `<button class="pill${n === feedSettings.videos ? ' active' : ''}"
+          onclick="setSetting('videos', ${n})">${n}</button>`).join('');
+    }
+
+    async function setSetting(key, value) {
+      const previous = feedSettings[key];
+      feedSettings = {...feedSettings, [key]: value};
+      renderSettings();
+      const res = await fetch('/api/feed/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(feedSettings),
+      });
+      if (!res.ok) {
+        feedSettings = {...feedSettings, [key]: previous};
+        renderSettings();
+        return message('Could not save settings.', true);
+      }
+      feedSettings = await res.json();
+      renderSettings();
+      // The count changes what a channel holds, so it only shows after a refresh.
+      message(key === 'videos'
+        ? 'Saved. Refresh the feed to apply the new count.'
+        : 'Saved.');
+    }
+
+    document.getElementById('settingsBtn').addEventListener('click', () => {
+      const panel = document.getElementById('settings');
+      panel.hidden = !panel.hidden;
+    });
 
     document.getElementById('addForm').addEventListener('submit', async e => {
       e.preventDefault();
@@ -93,38 +141,91 @@
       button.disabled = false;
       button.textContent = 'Refresh feed';
     });
+    /* Playing means downloading first, then using the app's own player on the
+       app's own file. The previous version embedded a YouTube iframe, which
+       sent every viewer straight back to YouTube. */
+    function videoSheet(video, media, actions) {
+      openModal({
+        title: video.title,
+        meta: [video.channel, fmtDate(video.upload_date), fmtDur(video.duration)]
+          .filter(Boolean).join(' \u00b7 '),
+        description: video.description || '',
+        media,
+        actions,
+      });
+    }
+
     function openVideo(index) {
       const video = feedVideos[index];
-      const modal = document.getElementById('modal');
-      document.getElementById('modalTitle').textContent = video.title;
-      document.getElementById('modalMeta').textContent = [video.channel, fmtDate(video.upload_date)].filter(Boolean).join(' · ');
-      document.getElementById('modalDescription').textContent = video.description || 'No description.';
-      document.getElementById('downloadLink').href = `/?url=${encodeURIComponent(video.url)}`;
-      const media = document.getElementById('modalMedia');
-      media.innerHTML = `<button class="feed-modal-thumb" type="button" onclick="playVideo(${index})">${video.thumbnail ? `<img src="${esc(video.thumbnail)}" alt="">` : ''}<span class="feed-play">▶</span></button>`;
-      modal.hidden = false;
-      document.body.style.overflow = 'hidden';
+      videoSheet(video, posterMarkup(video.thumbnail, 'Not downloaded yet'),
+        `<button class="card-dl-btn" onclick="playVideo(${index})">Play</button>
+         <button class="card-dl-btn" onclick="saveVideo(${index})">Download</button>`);
     }
-    function youtubeId(video) {
-      if (video.id) return video.id;
-      try {
-        const url = new URL(video.url);
-        return url.searchParams.get('v') || (url.hostname === 'youtu.be' ? url.pathname.slice(1) : '');
-      } catch (e) { return ''; }
+
+    async function startDownload(video) {
+      const res = await fetch('/api/download', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          url: video.url,
+          format: 'video',
+          max_height: feedSettings.quality,
+          title: video.title,
+          thumbnail: video.thumbnail,
+          uploader: video.channel,
+          upload_date: video.upload_date,
+          description: video.description || '',
+        }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      return data.job_id;
     }
-    function playVideo(index) {
+
+    function waitForFile(jobId) {
+      return new Promise((resolve, reject) => {
+        const poll = setInterval(async () => {
+          try {
+            const res = await fetch(`/api/status/${jobId}`);
+            const data = await res.json();
+            if (data.status === 'done') { clearInterval(poll); resolve(data); }
+            else if (data.status === 'error') { clearInterval(poll); reject(new Error(data.error)); }
+          } catch (e) { clearInterval(poll); reject(e); }
+        }, 1000);
+      });
+    }
+
+    async function playVideo(index) {
       const video = feedVideos[index];
-      const id = youtubeId(video);
-      if (!id) return;
-      document.getElementById('modalMedia').innerHTML = `<iframe class="feed-player" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1" title="${esc(video.title)}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
+      videoSheet(video, posterMarkup(video.thumbnail, 'Preparing\u2026'), '');
+      try {
+        const jobId = await startDownload(video);
+        const done = await waitForFile(jobId);
+        videoSheet(video, mediaMarkup(jobId, done.filename),
+          `<a class="card-dl-btn" href="/api/file/${jobId}" download>Save</a>`);
+      } catch (err) {
+        videoSheet(video, posterMarkup(video.thumbnail, friendlyError(err.message)),
+          `<button class="card-dl-btn" onclick="playVideo(${index})">Try again</button>`);
+      }
     }
-    function closeVideo() {
-      document.getElementById('modal').hidden = true;
-      document.getElementById('modalMedia').textContent = '';
-      document.body.style.overflow = '';
+
+    async function saveVideo(index) {
+      const video = feedVideos[index];
+      videoSheet(video, posterMarkup(video.thumbnail, 'Downloading\u2026'), '');
+      try {
+        const jobId = await startDownload(video);
+        const done = await waitForFile(jobId);
+        const a = document.createElement('a');
+        a.href = `/api/file/${jobId}`;
+        a.download = done.filename || '';
+        a.click();
+        videoSheet(video, posterMarkup(video.thumbnail, 'Saved'),
+          `<button class="card-dl-btn" onclick="playVideo(${index})">Play</button>`);
+      } catch (err) {
+        videoSheet(video, posterMarkup(video.thumbnail, friendlyError(err.message)),
+          `<button class="card-dl-btn" onclick="saveVideo(${index})">Try again</button>`);
+      }
     }
-    document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeVideo(); });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeVideo(); });
 
     async function removeChannel(id) {
       if (!confirm('Remove this channel from your feed?')) return;

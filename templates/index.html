@@ -38,6 +38,7 @@
   </div>
 
   <script src="/static/format.js"></script>
+  <script src="/static/modal.js"></script>
   <script>
     let currentFormat = 'video';
     let cardData = [];
@@ -616,42 +617,11 @@
 
     function openPlayer(idx) {
       const c = cardData[idx];
-      const tag = (c.filename || '').toLowerCase().endsWith('.mp3') ? 'audio' : 'video';
-
-      const overlay = document.createElement('div');
-      overlay.className = 'player-overlay';
-      overlay.innerHTML = `
-        <div class="player-box">
-          <div class="player-head">
-            <span class="player-title">${esc(c.title || c.filename || '')}</span>
-            <button class="player-close" aria-label="Close" title="Close">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          </div>
-          <${tag} class="player-media" src="/api/stream/${c.jobId}" controls autoplay playsinline></${tag}>
-        </div>
-      `;
-
-      function close() {
-        const media = overlay.querySelector('.player-media');
-        // Clearing the source stops the transfer; removing the node alone
-        // leaves the browser fetching in some engines.
-        media.pause();
-        media.removeAttribute('src');
-        media.load();
-        overlay.remove();
-        document.removeEventListener('keydown', onKey);
-      }
-      function onKey(e) {
-        if (e.key === 'Escape') close();
-      }
-
-      overlay.addEventListener('click', e => {
-        if (e.target === overlay) close();
+      openModal({
+        title: c.title || c.filename || '',
+        meta: [c.uploader, fmtDur(c.duration), fmtDate(c.upload_date)].filter(Boolean).join(' · '),
+        media: mediaMarkup(c.jobId, c.filename),
       });
-      overlay.querySelector('.player-close').addEventListener('click', close);
-      document.addEventListener('keydown', onKey);
-      document.body.appendChild(overlay);
     }
   </script>
   <script src="/static/theme.js"></script>

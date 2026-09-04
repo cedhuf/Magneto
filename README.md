@@ -48,9 +48,13 @@ docker build -t reclip . && docker run -p 8899:8899 reclip
 ### Feed
 
 Open **Feed** to follow YouTube channels. ReClip stores each channel's latest
-videos and merges them into a compact, newest-first grid. Use **Refresh
-feed** when you want to update the cached list; opening a video returns to the
-normal downloader, including its format and quality picker.
+videos and merges them into a compact, newest-first grid. **Settings** sets the
+quality and how many videos to keep per channel, for the whole feed rather than
+per video: a feed is read more than it is archived. **Refresh feed** updates one
+channel per request, so the wait is visible.
+
+Playing a feed video downloads it first, then plays the instance's own file.
+Nothing is embedded from YouTube.
 
 ## Retention
 
@@ -98,7 +102,7 @@ date rather than stored.
 | `RECLIP_RETENTION` | `86400` | Seconds a downloaded file is kept, counted from the file's date. Its entry stays afterwards |
 | `RECLIP_DOWNLOAD_TIMEOUT` | `1200` | Seconds a single download may take before it is killed |
 | `RECLIP_PLAYLIST_MAX` | `50` | Most videos one pasted playlist may expand to |
-| `RECLIP_FEED_VIDEOS` | `3` | Videos kept per followed channel |
+| `RECLIP_FEED_VIDEOS` | `5` | Ceiling for the per-user feed setting, not the setting itself |
 | `RECLIP_PIN_RETENTION` | `2592000` | Seconds a pinned file is kept. A pin moves the deadline, it does not lift it, so the disk stays bounded |
 | `RECLIP_HISTORY_MAX` | `200` | Entries kept per user. Older ones are dropped, pinned ones never |
 | `RECLIP_DB` | `data/reclip.db` | SQLite file. Put it on the same volume as the downloads, not inside the downloads directory |

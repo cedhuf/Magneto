@@ -25,9 +25,12 @@ DOWNLOAD_TIMEOUT = int(os.environ.get("RECLIP_DOWNLOAD_TIMEOUT", 20 * 60))
 # A playlist expansion costs one yt-dlp process per entry afterwards, so an
 # uncapped one is a way to bring the server down by pasting a link.
 PLAYLIST_MAX = int(os.environ.get("RECLIP_PLAYLIST_MAX", 50))
-# Videos kept per followed channel. Small on purpose: the feed is what is new,
-# not an archive, and every extra one is stored and rendered for every channel.
-FEED_VIDEOS = int(os.environ.get("RECLIP_FEED_VIDEOS", 3))
+# Ceiling for the per-user setting, not the setting itself. The feed is what is
+# new, not an archive, and every extra video is fetched, stored and rendered for
+# every channel a user follows.
+FEED_VIDEOS_MAX = int(os.environ.get("RECLIP_FEED_VIDEOS", 5))
+FEED_DEFAULTS = {"videos": 3, "quality": 720}
+FEED_QUALITIES = [360, 480, 720, 1080, 1440]
 # A pin does not exempt a file, it moves its deadline within a limit the admin
 # still owns. Otherwise the disk stops being bounded.
 PIN_RETENTION = int(os.environ.get("RECLIP_PIN_RETENTION", 30 * 24 * 3600))
@@ -86,6 +89,13 @@ MIGRATIONS = [
     """
     ALTER TABLE entries ADD COLUMN description TEXT;
     ALTER TABLE entries ADD COLUMN upload_date TEXT;
+    """,
+    """
+    CREATE TABLE settings (
+        owner        TEXT PRIMARY KEY,
+        feed_videos  INTEGER NOT NULL,
+        feed_quality INTEGER NOT NULL
+    );
     """,
     """
     CREATE TABLE subscriptions (
@@ -312,7 +322,7 @@ def janitor():
 threading.Thread(target=janitor, daemon=True).start()
 
 
-def run_download(job_id, url, format_choice, format_id, title):
+def run_download(job_id, url, format_choice, format_id, title, max_height=None):
     out_template = os.path.join(DOWNLOAD_DIR, f"{job_id}.%(ext)s")
 
     cmd = ["yt-dlp", "--no-playlist", "-o", out_template]
@@ -323,6 +333,13 @@ def run_download(job_id, url, format_choice, format_id, title):
         # Prefer m4a audio: Opus is legal in an mp4 container but Apple devices
         # read it poorly, and the merge is a stream copy either way.
         cmd += ["-f", f"{format_id}+bestaudio[ext=m4a]/bestaudio/best",
+                "--merge-output-format", "mp4"]
+    elif max_height:
+        # The feed asks for a height rather than a format id: it never looked
+        # the video up, so it has no ids to choose from.
+        cmd += ["-f", f"bestvideo[height<={max_height}]+bestaudio[ext=m4a]/"
+                      f"bestvideo[height<={max_height}]+bestaudio/"
+                      f"best[height<={max_height}]/best",
                 "--merge-output-format", "mp4"]
     else:
         cmd += ["-f", "bestvideo+bestaudio/best", "--merge-output-format", "mp4"]
@@ -362,6 +379,30 @@ def run_download(job_id, url, format_choice, format_id, title):
                      error=f"Download timed out ({DOWNLOAD_TIMEOUT // 60} min limit)")
     except Exception as e:
         update_entry(job_id, status="error", error=str(e))
+
+
+def get_settings(owner):
+    """Per-user feed settings, always within what the instance allows."""
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM settings WHERE owner = ?", (owner,)).fetchone()
+    videos = row["feed_videos"] if row else FEED_DEFAULTS["videos"]
+    quality = row["feed_quality"] if row else FEED_DEFAULTS["quality"]
+    return {"videos": max(1, min(videos, FEED_VIDEOS_MAX)),
+            "quality": quality if quality in FEED_QUALITIES else FEED_DEFAULTS["quality"]}
+
+
+def save_settings(owner, videos, quality):
+    videos = max(1, min(int(videos), FEED_VIDEOS_MAX))
+    quality = int(quality)
+    if quality not in FEED_QUALITIES:
+        quality = FEED_DEFAULTS["quality"]
+    with connect() as conn:
+        conn.execute("INSERT INTO settings (owner, feed_videos, feed_quality) "
+                     "VALUES (?, ?, ?) ON CONFLICT(owner) DO UPDATE SET "
+                     "feed_videos = excluded.feed_videos, "
+                     "feed_quality = excluded.feed_quality",
+                     (owner, videos, quality))
+    return {"videos": videos, "quality": quality}
 
 
 def youtube_videos_url(url):
@@ -416,7 +457,7 @@ def resolve_videos(urls):
     return parse_ytdlp_lines(result.stdout)
 
 
-def fetch_channel(url, known=None):
+def fetch_channel(url, known=None, count=None):
     """Return the newest videos of a channel, dated.
 
     A flat listing is one quick call but YouTube leaves its entries without any
@@ -426,7 +467,7 @@ def fetch_channel(url, known=None):
     videos_url = youtube_videos_url(url)
     if not videos_url:
         raise ValueError("Please enter a YouTube channel URL")
-    cmd = ["yt-dlp", "--flat-playlist", "--playlist-end", str(FEED_VIDEOS),
+    cmd = ["yt-dlp", "--flat-playlist", "--playlist-end", str(count or FEED_DEFAULTS["videos"]),
            "-J", "--", videos_url]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
     if result.returncode != 0:
@@ -489,7 +530,7 @@ def refresh_subscription(owner, url, channel_id=None):
                                (owner, channel_id)).fetchone()
         if row:
             known = {v["id"]: v for v in json.loads(row["videos"]) if v.get("id")}
-    channel = fetch_channel(url, known)
+    channel = fetch_channel(url, known, get_settings(owner)["videos"])
     with connect() as conn:
         conn.execute("INSERT INTO subscriptions "
                      "(owner, channel_id, channel_url, title, thumbnail, videos, refreshed_at) "
@@ -536,7 +577,23 @@ def feed():
                       for video in channel["videos"])
     # YYYYMMDD sorts correctly as a string. Unknown dates naturally sink.
     videos.sort(key=lambda video: video["upload_date"], reverse=True)
-    return jsonify({"channels": channels, "videos": videos})
+    return jsonify({"channels": channels, "videos": videos,
+                    "settings": get_settings(owner),
+                    "limits": {"videos_max": FEED_VIDEOS_MAX,
+                               "qualities": FEED_QUALITIES}})
+
+
+@app.route("/api/feed/settings", methods=["POST"])
+def feed_settings():
+    owner = current_user()
+    data = request.json or {}
+    current = get_settings(owner)
+    try:
+        saved = save_settings(owner, data.get("videos", current["videos"]),
+                              data.get("quality", current["quality"]))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid settings"}), 400
+    return jsonify(saved)
 
 
 @app.route("/api/feed/subscriptions", methods=["POST"])
@@ -807,6 +864,10 @@ def start_download():
     format_id = data.get("format_id")
     title = data.get("title", "")
     retry_of = data.get("job_id")
+    try:
+        max_height = int(data.get("max_height") or 0) or None
+    except (TypeError, ValueError):
+        max_height = None
 
     if not url:
         return jsonify({"error": "No URL provided"}), 400
@@ -824,13 +885,17 @@ def start_download():
         job_id = uuid.uuid4().hex[:10]
         with connect() as conn:
             conn.execute(
-                "INSERT INTO entries (job_id, owner, url, title, thumbnail, format,"
-                " format_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (job_id, owner, url, title, data.get("thumbnail", ""), format_choice,
-                 format_id, "downloading", time.time()))
+                "INSERT INTO entries (job_id, owner, url, title, thumbnail, uploader,"
+                " upload_date, description, format, format_id, status, created_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (job_id, owner, url, title, data.get("thumbnail", ""),
+                 data.get("uploader", ""), data.get("upload_date", ""),
+                 data.get("description", ""), format_choice, format_id,
+                 "downloading", time.time()))
 
     thread = threading.Thread(target=run_download,
-                              args=(job_id, url, format_choice, format_id, title))
+                              args=(job_id, url, format_choice, format_id, title,
+                                    max_height))
     thread.daemon = True
     thread.start()
 
