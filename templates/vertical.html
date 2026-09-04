@@ -29,6 +29,7 @@
           <span class="round-slot" id="shareSlot"></span>
         </div>
         <div class="shorts-date" id="date"></div>
+        <button class="shorts-sound" id="sound" hidden onclick="unmute()">Tap for sound</button>
         <div class="shorts-caption">
           <div class="shorts-title" id="title"></div>
           <div class="shorts-meta" id="meta"></div>
@@ -53,6 +54,7 @@
        already the act that downloads it. Show watched asks for the lot. */
     let watched = false;
     let reading = -1;
+    let current = null;
     let hidden = 0;
     /* A touch screen has no hover, so the browser shows its own controls on
        every new clip and leaves them there for seconds. On a clip that lasts
@@ -140,6 +142,7 @@
       const clip = clips[at];
       if (!clip) return;
       if (reading >= 0 && reading !== at && clips[reading]) markSeen(clips[reading].url);
+      if (reading !== at) { current = null; document.getElementById('sound').hidden = true; }
       reading = at;
       document.getElementById('prevBtn').disabled = at === 0;
       document.getElementById('nextBtn').disabled = at === clips.length - 1;
@@ -161,7 +164,7 @@
              ${TAP ? '' : 'controls'} autoplay loop playsinline></video>`
           + (TAP ? '<div class="shorts-progress"><span id="played"></span></div>' : '');
         mounted = at;
-        if (TAP) wireTap(slides[at].querySelector('video'));
+        play(slides[at].querySelector('video'));
       } else {
         slides[at].innerHTML = poster(clip);
         mounted = -1;
@@ -203,8 +206,35 @@
       await load();
     });
 
+    /* Safari will not start a video that has sound until the page has been
+       touched, and says so with a rejected promise rather than an error: the
+       clip simply sits there. Muting is the only way to keep the reel moving,
+       and the tap that gives the sound back also unlocks it for the session,
+       so it happens once. */
+    function play(video) {
+      if (!video) return;
+      current = video;
+      video.play().catch(() => {
+        video.muted = true;
+        document.getElementById('sound').hidden = false;
+        video.play().catch(() => {});
+      });
+      if (TAP) wireTap(video);
+    }
+
+    function unmute() {
+      if (!current) return;
+      current.muted = false;
+      current.play().catch(() => {});
+      document.getElementById('sound').hidden = true;
+    }
+
     function wireTap(video) {
-      video.addEventListener('click', () => video.paused ? video.play() : video.pause());
+      // The first tap is worth sound, not a pause: that is what it is asking for.
+      video.addEventListener('click', () => {
+        if (video.muted) return unmute();
+        video.paused ? video.play() : video.pause();
+      });
       video.addEventListener('timeupdate', () => {
         const bar = document.getElementById('played');
         if (bar && video.duration) bar.style.width = `${video.currentTime / video.duration * 100}%`;

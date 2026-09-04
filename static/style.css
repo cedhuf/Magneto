@@ -1150,6 +1150,25 @@ audio.modal-media {
   text-transform: uppercase;
 }
 .shorts-meta svg { width: 12px; height: 12px; flex: 0 0 auto; }
+/* Only there when the browser refused the sound, and gone at the first tap. */
+.shorts-sound {
+  grid-area: media;
+  align-self: start;
+  justify-self: start;
+  z-index: 2;
+  margin: 10px 0 0 10px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
 /* The one thing worth knowing before watching: how old it is. */
 .shorts-date {
   grid-area: media;
