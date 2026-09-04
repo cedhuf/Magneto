@@ -195,6 +195,8 @@ YouTube, TikTok, Instagram, Twitter/X, Reddit, Facebook, Vimeo, Twitch, Dailymot
 - **Frontend:** Vanilla HTML/CSS/JS, no build step
 - **Fonts:** Instrument Serif and DM Mono, self-hosted in `static/fonts` under
   the SIL Open Font License. No page load reaches a third party
+- **Icons:** [Tabler Icons](https://tabler.io/icons) 3.46.0 (MIT), vendored in
+  `static/icons.js`. Only the handful used is carried, so nothing is fetched
 - **Download engine:** [yt-dlp](https://github.com/yt-dlp/yt-dlp) + [ffmpeg](https://ffmpeg.org/)
 - **JavaScript runtime:** [deno](https://deno.com/) and the solver scripts, both
   from `yt-dlp[default,deno]`. YouTube's player challenge needs a real JS engine;

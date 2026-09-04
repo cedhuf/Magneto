@@ -2,15 +2,14 @@
    The confirmation stays where the action is, next to the row it will remove,
    and the browser dialog it replaces could not say which row that was. */
 
-const TRASH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
 
 /* Two shapes, one behaviour: a labelled button in a list, an icon on a card.
    `action` is inlined as JavaScript, so it must not carry a double quote. */
-function deleteButton(action, { icon = false, label = 'Delete', confirm = 'Confirm' } = {}) {
-  const shape = icon ? 'icon-btn danger' : 'row-btn';
+function deleteButton(action, { icon: asIcon = false, label = 'Delete', confirm = 'Confirm' } = {}) {
+  const shape = asIcon ? 'icon-btn danger' : 'row-btn';
   return `<button class="${shape} del-btn" data-confirm="${esc(confirm)}"
     title="${esc(label)}" aria-label="${esc(label)}"
-    onclick="if (armDelete(this)) { ${action} }">${icon ? TRASH_ICON : esc(label)}</button>`;
+    onclick="if (armDelete(this)) { ${action} }">${asIcon ? icon('trash') : esc(label)}</button>`;
 }
 
 let armedDelete = null;

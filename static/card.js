@@ -13,11 +13,9 @@ function badgeMarkup(badges) {
 function thumbMarkup({ thumbnail, badges, play, alt = '' }) {
   const image = thumbnail
     ? `<img src="${esc(thumbnail)}" alt="${esc(alt)}">`
-    : `<div class="no-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></div>`;
+    : `<div class="no-thumb">${icon('photo')}</div>`;
   const button = play
-    ? `<button class="thumb-play" onclick="${play}" aria-label="Play" title="Play">
-         <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 21 12 6 21 6 3"/></svg>
-       </button>`
+    ? `<button class="thumb-play" onclick="${play}" aria-label="Play" title="Play">${icon('play')}</button>`
     : '';
   return `<div class="card-thumb">${image}${button}${badgeMarkup(badges)}</div>`;
 }

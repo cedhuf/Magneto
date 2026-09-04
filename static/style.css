@@ -356,11 +356,14 @@ textarea::placeholder { color: var(--muted); }
   overflow: hidden;
 }
 .cards.grid .card { height: 100%; }
+/* A tile is already a column, so the frame lies down along its foot. */
 .cards.grid .card-side {
+  flex: 0 0 auto;
   flex-direction: row;
+  align-items: center;
   width: 100%;
-  justify-content: space-between;
   padding: 12px 14px 14px;
+  border-left: none;
 }
 
 /* Admin */
@@ -512,7 +515,7 @@ textarea::placeholder { color: var(--muted); }
 
 .card.expanded { align-items: flex-start; }
 .card.expanded .card-thumb { height: 96px; align-self: auto; }
-.card.expanded .card-side { align-items: flex-start; padding-top: 14px; }
+.card.expanded .card-side { justify-content: flex-start; padding-top: 14px; }
 
 /* Flush to the card's left, top and bottom edges: the card's own radius and
    overflow do the rounding, the image has none of its own. */
@@ -680,17 +683,21 @@ audio.modal-media {
 
 /* The action column has a width of its own, so nothing in the text can push
    the buttons around, and the buttons line up down the list. */
-/* One line, icons first. Stacked, a card with a single icon left it orphaned
-   under the button; beside it, it reads as part of the same group. */
+/* A column of its own on the right, one fixed width for every card so the
+   buttons line up down the list: the action on top, what acts on the entry
+   underneath. A hairline rather than a filled panel, the card is already one. */
 .card-side {
-  flex-shrink: 0;
-  padding: 12px 14px;
+  flex: 0 0 132px;
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-left: 1.5px solid var(--card-border);
 }
-.card-icons { display: flex; gap: 2px; margin-right: 4px; }
+.card-side .card-dl-btn,
+.card-side .card-status { justify-content: center; text-align: center; }
+.card-icons { display: flex; justify-content: center; gap: 2px; }
 .card-note-row { margin-top: 5px; }
 
 /* Folded by default: a row keeps its height until someone asks for more. */
@@ -934,11 +941,13 @@ audio.modal-media {
   }
   .card-body { padding: 12px 14px 0; }
   .card-side {
+    flex: 0 0 auto;
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
     width: 100%;
     padding: 12px 14px 14px;
+    border-left: none;
   }
   .card-title { white-space: normal; }
   .controls { flex-wrap: wrap; }
