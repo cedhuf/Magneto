@@ -995,19 +995,18 @@ audio.modal-media {
    That single number is --stage: the height the video may take once the
    header, the caption and the page's own margins have had theirs. */
 .shorts {
-  --chrome: 250px;
+  --chrome: 290px;
   --stage: clamp(360px, calc(100dvh - var(--chrome)), 900px);
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 /* The pages that manage their own accounts carry one more bar above the frame. */
-.shorts.manage { --chrome: 300px; }
-/* These two pages hold one thing, so they give it the room the other pages
-   spend on the space around their lists. */
-.page:has(.shorts) { padding: 28px 24px 32px; }
-.page:has(.shorts) .brand { margin-bottom: 18px; }
-.page:has(.shorts) .feed-head { margin: 0 0 10px; }
+.shorts.manage { --chrome: 350px; }
+/* Only the bottom margin is given back to the video. Everything above the frame
+   keeps the spacing of every other page, or the header would sit at a different
+   height here and move as you walk between the tabs. */
+.page:has(.shorts) { padding-bottom: 24px; }
 .shorts-frame {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
