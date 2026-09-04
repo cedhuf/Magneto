@@ -18,19 +18,8 @@
 </head>
 <body>
   <div class="page">
-    <div class="brand">
-      <div class="brand-text">
-        <h1>Re<em>Clip</em></h1>
-        <p>Paste a link, keep the clip</p>
-      </div>
-      <div class="brand-actions">
-        <a class="text-btn" id="who" hidden></a>
-        <a class="text-btn" href="/feed">Feed</a>
-        <a class="text-btn" id="logoutLink" href="#" hidden>Sign out</a>
-        <a class="text-btn" id="soloAdmin" href="/admin" hidden>Admin</a>
-        <button class="text-btn theme-btn" id="theme-btn" onclick="cycleTheme()" type="button"></button>
-      </div>
-    </div>
+    {% set tagline = "Paste a link, keep the clip" %}
+    {% include "_header.html" %}
 
     <textarea id="urls" placeholder="Paste one or more URLs..." rows="2"></textarea>
     <p class="hint" id="hint">Multiple links? Separate with spaces, commas, or newlines.</p>
@@ -212,39 +201,52 @@
         ? `Playlist capped at ${capped} videos.`
         : HINT;
 
-      for (let i = 0; i < urls.length; i++) {
-        const url = urls[i];
-        const idx = cardData.length;
-        cardData.push({ url, status: 'loading' });
+      // Every card exists before the first lookup returns, so a batch shows its
+      // shape at once instead of growing a row every few seconds.
+      const batch = urls.map(url => {
+        const idx = cardData.push({ url, status: 'loading' }) - 1;
         renderCard(idx);
+        return idx;
+      });
 
+      async function lookup(idx) {
+        const c = cardData[idx];
         try {
           const res = await fetch('/api/info', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url }),
+            body: JSON.stringify({ url: c.url }),
           });
           const data = await res.json();
           if (data.error) {
-            cardData[idx] = { ...cardData[idx], status: 'info-error', error: data.error };
+            cardData[idx] = { ...c, status: 'info-error', error: data.error };
           } else {
             cardData[idx] = {
-              ...cardData[idx],
+              ...c,
               status: 'ready',
               jobId: data.job_id,
               title: data.title || '',
               thumbnail: data.thumbnail || '',
               duration: data.duration,
               uploader: data.uploader || '',
+              description: data.description || '',
+              upload_date: data.upload_date || '',
               formats: data.formats || [],
               selectedFormatId: defaultFormatId(data.formats),
             };
           }
         } catch (err) {
-          cardData[idx] = { ...cardData[idx], status: 'info-error', error: err.message };
+          cardData[idx] = { ...c, status: 'info-error', error: err.message };
         }
         renderCard(idx);
       }
+
+      // A few at a time. Each lookup is a yt-dlp process on the server, which
+      // has four threads: this fills them without queueing behind itself.
+      let next = 0;
+      await Promise.all([0, 1, 2].map(async () => {
+        while (next < batch.length) await lookup(batch[next++]);
+      }));
 
       // Appending moves the nodes, which puts the carried-over cards under the
       // batch that was just fetched.
@@ -635,33 +637,7 @@
       if (readyCount() > 1) renderDownloadAll();
     }
 
-    /* Who is signed in, and where to sign out. Both only mean something behind
-       a proxy: the session is its, not ours. */
-    async function loadMe() {
-      try {
-        const res = await fetch('/api/me');
-        if (!res.ok) return;
-        const me = await res.json();
-        // Every link follows the right it needs, so none can offer a 403.
-        if (me.auth !== 'proxy') {
-          document.getElementById('soloAdmin').hidden = !me.admin;
-          return;
-        }
-        const who = document.getElementById('who');
-        who.textContent = me.user;
-        who.hidden = false;
-        // An admin's own name is the way in. For everyone else it stays a
-        // label: no href means nothing to click and nothing to discover.
-        if (me.admin) who.href = '/admin';
-        if (me.logout_url) {
-          const link = document.getElementById('logoutLink');
-          link.href = me.logout_url;
-          link.hidden = false;
-        }
-      } catch (e) {}
-    }
 
-    loadMe();
     restoreEntries();
     // Feed links arrive here ready to use the normal format and quality picker.
     const feedUrl = new URLSearchParams(location.search).get('url');

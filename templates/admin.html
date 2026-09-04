@@ -18,15 +18,8 @@
 </head>
 <body>
   <div class="page">
-    <div class="brand">
-      <div class="brand-text">
-        <h1><a class="brand-link" href="/">Re<em>Clip</em></a></h1>
-        <p>Administration</p>
-      </div>
-      <div class="brand-actions">
-        <button class="text-btn theme-btn" id="theme-btn" onclick="cycleTheme()" type="button"></button>
-      </div>
-    </div>
+    {% set tagline = "Administration" %}
+    {% include "_header.html" %}
 
     <div class="stats" id="stats"></div>
 

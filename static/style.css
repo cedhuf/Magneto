@@ -212,6 +212,11 @@ body::after {
   min-width: calc(6ch + 14px);
   text-align: right;
 }
+/* The label comes from the attribute the head script sets before first paint,
+   so it is correct on the first frame instead of appearing a moment later. */
+.theme-btn::after { content: 'Auto'; }
+:root[data-theme="light"] .theme-btn::after { content: 'Light'; }
+:root[data-theme="dark"] .theme-btn::after { content: 'Dark'; }
 .brand h1 {
   font-family: 'Instrument Serif', serif;
   font-size: clamp(2.6rem, 8vw, 4.2rem);

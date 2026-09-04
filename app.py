@@ -110,6 +110,16 @@ def migrate():
 migrate()
 
 
+def recover_interrupted():
+    with connect() as conn:
+        conn.execute("UPDATE entries SET status = 'error', error = ? "
+                     "WHERE status = 'downloading'",
+                     ("Interrupted by a server restart",))
+
+
+recover_interrupted()
+
+
 def current_user():
     if AUTH_MODE != "proxy":
         return SOLO_USER
@@ -446,17 +456,12 @@ def page_context():
 
 @app.route("/")
 def index():
-    return render_template("index.html", **page_context())
+    return render_template("index.html", page="home", **page_context())
 
 
 @app.route("/feed")
 def feed_page():
-    return render_template("feed.html", **page_context())
-
-
-@app.route("/api/me")
-def me():
-    return jsonify(page_context())
+    return render_template("feed.html", page="feed", **page_context())
 
 
 @app.route("/api/feed")
@@ -518,7 +523,7 @@ def unsubscribe(channel_id):
 @app.route("/admin")
 def admin_page():
     require_admin()
-    return render_template("admin.html", **page_context())
+    return render_template("admin.html", page="admin", **page_context())
 
 
 @app.route("/api/admin/overview")

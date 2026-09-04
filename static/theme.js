@@ -1,7 +1,7 @@
-/* Theme: system, light, dark. "system" stores nothing and lets the
-   stylesheet's media query decide. */
+/* Theme: system, light, dark. "system" stores nothing and lets the stylesheet's
+   media query decide. The label itself is drawn by CSS from the same attribute,
+   so nothing here runs before the button reads correctly. */
 const THEMES = ['system', 'light', 'dark'];
-const THEME_LABELS = { system: 'Auto', light: 'Light', dark: 'Dark' };
 
 function currentTheme() {
   try {
@@ -18,9 +18,7 @@ function applyTheme(theme) {
     document.documentElement.dataset.theme = theme;
   }
   const btn = document.getElementById('theme-btn');
-  btn.textContent = THEME_LABELS[theme];
-  btn.title = `Theme: ${theme}. Click to change.`;
-  btn.setAttribute('aria-label', `Theme: ${theme}. Click to change.`);
+  if (btn) btn.title = `Theme: ${theme}. Click to change.`;
 }
 
 function cycleTheme() {

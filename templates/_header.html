@@ -1,0 +1,25 @@
+{# Rendered server-side. The identity is known here, so asking the browser to
+   fetch it afterwards only bought a flash of empty header on every page. #}
+<div class="brand">
+  <div class="brand-text">
+    <h1><a class="brand-link" href="/">Re<em>Clip</em></a></h1>
+    <p>{{ tagline }}</p>
+  </div>
+  <div class="brand-actions">
+    {% if auth == 'proxy' %}
+      {% if admin %}
+        <a class="text-btn" href="/admin">{{ user }}</a>
+      {% else %}
+        <span class="text-btn">{{ user }}</span>
+      {% endif %}
+    {% elif admin %}
+      <a class="text-btn" href="/admin">Admin</a>
+    {% endif %}
+    {% if page != 'feed' %}<a class="text-btn" href="/feed">Feed</a>{% endif %}
+    {% if auth == 'proxy' and logout_url %}
+      <a class="text-btn" href="{{ logout_url }}">Sign out</a>
+    {% endif %}
+    <button class="text-btn theme-btn" id="theme-btn" onclick="cycleTheme()"
+            type="button" aria-label="Theme"></button>
+  </div>
+</div>
