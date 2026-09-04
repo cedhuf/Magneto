@@ -80,6 +80,10 @@
         tile('Free on this disk', fmtSize(d.disk.free)),
         tile('Entries', String(d.entries.length), `${users.length} user(s)`),
         tile('Retention', fmtSpan(d.retention), d.auth === 'proxy' ? 'proxy auth' : 'single user'),
+        // The only thing here that outlives the ordinary deadline, so the only
+        // thing that can grow the disk without anybody deciding to.
+        tile('Pinned', fmtSize(d.pinned.bytes) || '0 MB',
+             `${d.pinned.entries} kept ${fmtSpan(d.pinned.retention)}`),
         shortsTile,
       ].join('');
 

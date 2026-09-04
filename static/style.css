@@ -394,11 +394,15 @@ textarea::placeholder { color: var(--muted); }
 /* The page you are on is marked, not removed. */
 .text-btn.active { color: var(--fg); cursor: default; }
 
+/* Three by three rather than one squeezed row: six figures side by side are
+   read one after another, in a grid they are read at a glance. */
 .stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
+@media (max-width: 720px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 460px) { .stats { grid-template-columns: 1fr; } }
 .stat {
   border: 1.5px solid var(--card-border);
   border-radius: var(--radius);

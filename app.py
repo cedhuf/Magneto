@@ -453,9 +453,12 @@ def stalest_slot():
         queue.append("SELECT c.channel_id, c.channel_url, 'shorts', c.shorts_refreshed_at "
                      "FROM channels c JOIN follows f ON f.channel_id = c.channel_id")
     with connect() as conn:
+        # A tie goes to the tab that did not go last. Freshly imported channels
+        # are all dated zero, so without this the queue does every Videos tab
+        # before the first Shorts one: hours before a shorts page shows anything.
         return conn.execute(
             f"SELECT * FROM ({' UNION ALL '.join(queue)}) WHERE age < ? "
-            "ORDER BY age LIMIT 1", (cutoff,)).fetchone()
+            "ORDER BY age, tab = ? LIMIT 1", (cutoff, last_tab)).fetchone()
 
 
 def feed_poller():
@@ -465,12 +468,14 @@ def feed_poller():
     and a ceiling on outbound lookups that does not move with the number of
     users, channels or pages enabled.
     """
+    global last_tab
     while True:
         time.sleep(FEED_POLL)
         try:
             row = stalest_slot()
             if not row:
                 continue
+            last_tab = row["tab"]
             if row["tab"] == "shorts":
                 refresh_shorts(row["channel_url"], row["channel_id"])
             else:
@@ -554,6 +559,8 @@ def run_download(job_id, url, format_choice, format_id, title, max_height=None):
 # Held for the whole of a channel lookup, so two refreshes can never talk to
 # YouTube at the same time whoever asked for them.
 feed_lock = threading.Lock()
+# Which tab the last lookup was for, so ties alternate rather than starving one.
+last_tab = "shorts"
 last_channel_call = 0.0
 
 
@@ -1064,6 +1071,9 @@ def admin_overview():
         # Shorts are listed as one line, not one row each: a hundred of them
         # would bury the entries somebody actually asked for.
         shorts = conn.execute("SELECT path FROM entries WHERE kind = 'short'").fetchall()
+        # What escapes the ordinary deadline, and so what can grow the disk
+        # without anybody deciding to.
+        pinned = conn.execute("SELECT path FROM entries WHERE pinned = 1").fetchall()
 
     users = {}
     entries = []
@@ -1080,6 +1090,9 @@ def admin_overview():
     return jsonify({
         "retention": RETENTION,
         "auth": AUTH_MODE,
+        "pinned": {"entries": len(pinned),
+                   "bytes": sum(file_size(r["path"]) for r in pinned if r["path"]),
+                   "retention": PIN_RETENTION},
         "shorts": {"entries": len(shorts),
                    "bytes": sum(file_size(r["path"]) for r in shorts if r["path"]),
                    "retention": SHORTS_RETENTION,
