@@ -143,6 +143,9 @@ MIGRATIONS = [
         SELECT owner, channel_id FROM subscriptions;
     DROP TABLE subscriptions;
     """,
+    """
+    ALTER TABLE entries ADD COLUMN variant TEXT;
+    """,
 ]
 
 
@@ -200,6 +203,35 @@ def require_admin():
     else:
         detail = "no groups received at all, so the proxy is not copying Remote-Groups"
     abort(403, f"Admin needs the {ADMIN_GROUP} group. For {current_user()}, {detail}.")
+
+
+def variant_of(format_choice, format_id, max_height):
+    """What was actually asked for, as one comparable string.
+
+    Two accounts asking for the same URL in the same variant deserve one file,
+    not two: it is the same bytes, and downloading it twice also asks YouTube
+    twice.
+    """
+    if format_choice == "audio":
+        return "audio"
+    if format_id:
+        return f"video:{format_id}"
+    if max_height:
+        return f"video:h{max_height}"
+    return "video:best"
+
+
+def twin_of(url, variant):
+    """A finished entry, any owner, holding the very same file."""
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT path, filename FROM entries WHERE url = ? AND variant = ? "
+            "AND status = 'done' AND path IS NOT NULL ORDER BY created_at DESC",
+            (url, variant)).fetchall()
+    for row in rows:
+        if os.path.exists(row["path"]):
+            return row
+    return None
 
 
 def file_size(path):
@@ -291,6 +323,18 @@ def parse_ytdlp_json(stdout):
     raise ValueError("yt-dlp returned no data")
 
 
+def drop_file(path, keeping=None):
+    """Remove a file only when no other entry still points at it."""
+    if not path:
+        return
+    with connect() as conn:
+        others = conn.execute(
+            "SELECT count(*) FROM entries WHERE path = ? AND job_id != ?",
+            (path, keeping or "")).fetchone()[0]
+    if not others:
+        remove_quietly(path)
+
+
 def remove_quietly(path):
     try:
         os.remove(path)
@@ -306,21 +350,29 @@ def sweep_downloads():
     """
     now = time.time()
     with connect() as conn:
-        known = {r["job_id"]: r["pinned"] for r in
-                 conn.execute("SELECT job_id, pinned FROM entries")}
+        # A file can be referenced by several entries, so the deadline is keyed
+        # by path and the most generous reference wins: nobody's pin may be
+        # undone by somebody else's expiry.
+        deadlines = {}
+        for row in conn.execute("SELECT path, pinned FROM entries WHERE path IS NOT NULL"):
+            ttl = PIN_RETENTION if row["pinned"] else RETENTION
+            deadlines[row["path"]] = max(deadlines.get(row["path"], 0), ttl)
+        # A download in flight has no path yet, and is recognised by its name.
+        running = {r["job_id"] for r in
+                   conn.execute("SELECT job_id FROM entries WHERE status = 'downloading'")}
 
     for path in glob.glob(os.path.join(DOWNLOAD_DIR, "*")):
-        job_id = os.path.basename(path).split(".")[0]
         try:
             age = now - os.path.getmtime(path)
         except OSError:
             continue
-        if job_id in known:
-            if age < (PIN_RETENTION if known[job_id] else RETENTION):
-                continue
+        if os.path.basename(path).split(".")[0] in running:
+            continue
+        if path in deadlines and age < deadlines[path]:
+            continue
         remove_quietly(path)
-        if job_id in known:
-            update_entry(job_id, path=None)
+        with connect() as conn:
+            conn.execute("UPDATE entries SET path = NULL WHERE path = ?", (path,))
 
     trim_history()
 
@@ -339,8 +391,7 @@ def trim_history():
             "      PARTITION BY owner ORDER BY created_at DESC) AS rank FROM entries"
             "  ) WHERE rank <= ?)", (HISTORY_MAX,)).fetchall()
         for row in stale:
-            if row["path"]:
-                remove_quietly(row["path"])
+            drop_file(row["path"], keeping=row["job_id"])
             conn.execute("DELETE FROM entries WHERE job_id = ?", (row["job_id"],))
 
 
@@ -804,8 +855,7 @@ def admin_delete_entry(job_id):
     row = get_entry(job_id)
     if row is None:
         return jsonify({"error": "Not found"}), 404
-    if row["path"]:
-        remove_quietly(row["path"])
+    drop_file(row["path"], keeping=job_id)
     with connect() as conn:
         conn.execute("DELETE FROM entries WHERE job_id = ?", (job_id,))
     return jsonify({"ok": True})
@@ -836,8 +886,7 @@ def delete_entry(job_id):
     row = get_entry(job_id, current_user())
     if row is None:
         return jsonify({"error": "Not found"}), 404
-    if row["path"]:
-        remove_quietly(row["path"])
+    drop_file(row["path"], keeping=job_id)
     with connect() as conn:
         conn.execute("DELETE FROM entries WHERE job_id = ?", (job_id,))
     return jsonify({"ok": True})
@@ -1016,6 +1065,18 @@ def start_download():
                  data.get("uploader", ""), data.get("upload_date", ""),
                  data.get("description", ""), format_choice, format_id,
                  "downloading", time.time()))
+
+    variant = variant_of(format_choice, format_id, max_height)
+    update_entry(job_id, variant=variant)
+
+    twin = twin_of(url, variant)
+    if twin:
+        # The same bytes already exist. Point at them instead of asking YouTube
+        # for a second copy; the sweep keeps the file while either entry needs
+        # it, and deleting one entry never takes the other's file.
+        update_entry(job_id, status="done", path=twin["path"],
+                     filename=twin["filename"], error=None)
+        return jsonify({"job_id": job_id, "reused": True})
 
     thread = threading.Thread(target=run_download,
                               args=(job_id, url, format_choice, format_id, title,

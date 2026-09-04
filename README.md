@@ -84,6 +84,12 @@ Files are temporary, the list is not. A file is deleted once it reaches
 so the download can be started again from the same card with one click. Both
 live in `/app/data` and `/app/downloads`, which is all a volume needs to cover.
 
+Asking for a URL in a quality somebody already downloaded reuses that file
+rather than fetching it again: it is the same bytes, and a second download also
+asks YouTube a second time. Each account keeps its own entry, the file is kept
+while any of them still needs it, and deleting one entry never takes another's
+file.
+
 Pin an entry to keep its file until `RECLIP_PIN_RETENTION` instead. That moves
 the deadline to a longer one the admin still owns, rather than exempting the
 file, which is what keeps the disk bounded. Delete an entry and both the file
