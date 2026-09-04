@@ -1,12 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ReClip — Feed</title>
-  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/style.css">
-  <script>try { var saved = localStorage.getItem('theme'); if (saved === 'dark' || saved === 'light') document.documentElement.dataset.theme = saved; } catch (e) {}</script>
+  {% set page_title = "ReClip — Feed" %}
+  {% include "_head.html" %}
 </head>
 <body>
   <div class="page">
@@ -17,7 +13,7 @@
       <input id="channelUrl" type="url" placeholder="Paste a YouTube channel URL…" required>
       <button class="fetch-btn" id="addBtn">Add channel</button>
     </form>
-    <p class="hint" id="message">Add a channel to see its five latest videos.</p>
+    <p class="hint" id="message">Add a channel to see its latest videos.</p>
 
     <div class="feed-head" id="feedHead" hidden>
       <span id="videoCount"></span>
@@ -38,12 +34,10 @@
     </div>
   </div>
 
+  <script src="/static/format.js"></script>
   <script>
-    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     let feedVideos = [];
-    const esc = s => { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; };
-    function date(s) { return s && s.length === 8 ? `${+s.slice(6)} ${MONTHS[+s.slice(4, 6) - 1]} ${s.slice(0, 4)}` : ''; }
-    function duration(s) { return s ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` : ''; }
+    let feedChannels = [];
     function message(text, error = false) { const el = document.getElementById('message'); el.textContent = text; el.style.color = error ? 'var(--error)' : ''; }
 
     async function load() {
@@ -51,11 +45,12 @@
       if (!res.ok) return;
       const data = await res.json();
       feedVideos = data.videos;
+      feedChannels = data.channels;
       const videos = document.getElementById('videos');
       videos.innerHTML = data.videos.map((v, i) => `<button class="feed-video" type="button" onclick="openVideo(${i})">
-        <div class="feed-thumb">${v.thumbnail ? `<img src="${esc(v.thumbnail)}" alt="">` : ''}${date(v.upload_date) ? `<span class="feed-date">${date(v.upload_date)}</span>` : ''}${v.duration ? `<span class="feed-duration">${duration(v.duration)}</span>` : ''}</div>
+        <div class="feed-thumb">${v.thumbnail ? `<img src="${esc(v.thumbnail)}" alt="">` : ''}${fmtDate(v.upload_date) ? `<span class="feed-date">${fmtDate(v.upload_date)}</span>` : ''}${v.duration ? `<span class="feed-duration">${fmtDur(v.duration)}</span>` : ''}</div>
         <div class="feed-video-body"><div class="feed-video-title">${esc(v.title)}</div>
-        <div class="feed-video-meta">${esc(v.channel)}${date(v.upload_date) ? ` · ${date(v.upload_date)}` : ''}</div></div>
+        <div class="feed-video-meta">${esc(v.channel)}${fmtDate(v.upload_date) ? ` · ${fmtDate(v.upload_date)}` : ''}</div></div>
       </button>`).join('');
       document.getElementById('feedHead').hidden = !data.channels.length;
       document.getElementById('videoCount').textContent = `${data.videos.length} latest video${data.videos.length === 1 ? '' : 's'}`;
@@ -73,19 +68,36 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Could not add channel');
         document.getElementById('channelUrl').value = ''; message('Channel added.'); await load();
-      } catch (err) { message(err.message, true); }
+      } catch (err) { message(friendlyError(err.message), true); }
       button.disabled = false; button.textContent = 'Add channel';
     });
     document.getElementById('refreshBtn').addEventListener('click', async () => {
-      const button = document.getElementById('refreshBtn'); button.disabled = true; button.textContent = 'Refreshing…';
-      const res = await fetch('/api/feed/refresh', {method: 'POST'}); const data = await res.json();
-      message(data.error || 'Feed refreshed.', !!data.error); await load(); button.disabled = false; button.textContent = 'Refresh feed';
+      const button = document.getElementById('refreshBtn');
+      button.disabled = true;
+      // One channel per request, so the wait is visible and no single call can
+      // outlive the worker timeout.
+      let failed = 0;
+      for (let i = 0; i < feedChannels.length; i++) {
+        button.textContent = `Refreshing ${i + 1}/${feedChannels.length}…`;
+        try {
+          const res = await fetch('/api/feed/refresh', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({channel_id: feedChannels[i].channel_id}),
+          });
+          if (!res.ok) failed++;
+        } catch (e) { failed++; }
+      }
+      await load();
+      message(failed ? `${failed} channel(s) could not be refreshed.` : 'Feed refreshed.', !!failed);
+      button.disabled = false;
+      button.textContent = 'Refresh feed';
     });
     function openVideo(index) {
       const video = feedVideos[index];
       const modal = document.getElementById('modal');
       document.getElementById('modalTitle').textContent = video.title;
-      document.getElementById('modalMeta').textContent = [video.channel, date(video.upload_date)].filter(Boolean).join(' · ');
+      document.getElementById('modalMeta').textContent = [video.channel, fmtDate(video.upload_date)].filter(Boolean).join(' · ');
       document.getElementById('modalDescription').textContent = video.description || 'No description.';
       document.getElementById('downloadLink').href = `/?url=${encodeURIComponent(video.url)}`;
       const media = document.getElementById('modalMedia');

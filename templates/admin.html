@@ -1,20 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ReClip admin</title>
-  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/style.css">
-  <script>
-    // Before first paint, or the page flashes light before the choice applies.
-    try {
-      var saved = localStorage.getItem('theme');
-      if (saved === 'dark' || saved === 'light') {
-        document.documentElement.dataset.theme = saved;
-      }
-    } catch (e) {}
-  </script>
+  {% set page_title = "ReClip — Admin" %}
+  {% include "_head.html" %}
 </head>
 <body>
   <div class="page">
@@ -36,21 +24,9 @@
     </div>
   </div>
 
+  <script src="/static/format.js"></script>
   <script>
-    function esc(s) {
-      const d = document.createElement('div');
-      d.textContent = s;
-      return d.innerHTML;
-    }
-
-    function bytes(n) {
-      if (!n) return '0';
-      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-      const i = Math.min(Math.floor(Math.log(n) / Math.log(1024)), units.length - 1);
-      return `${(n / 1024 ** i).toFixed(i ? 1 : 0)} ${units[i]}`;
-    }
-
-    function duration(s) {
+    function fmtSpan(s) {
       if (s <= 0) return 'gone';
       const h = Math.floor(s / 3600);
       if (h >= 48) return `${Math.floor(h / 24)}d`;
@@ -58,7 +34,7 @@
     }
 
     function ago(ts) {
-      return duration(Math.floor(Date.now() / 1000 - ts)).replace('gone', 'now');
+      return fmtSpan(Math.floor(Date.now() / 1000 - ts)).replace('gone', 'now');
     }
 
     function tile(label, value, hint) {
@@ -80,10 +56,10 @@
 
       const users = Object.entries(d.users);
       document.getElementById('stats').innerHTML = [
-        tile('Taken by downloads', bytes(d.disk.bytes), `${d.disk.files} file(s) on disk`),
-        tile('Free on this disk', bytes(d.disk.free)),
+        tile('Taken by downloads', fmtSize(d.disk.bytes), `${d.disk.files} file(s) on disk`),
+        tile('Free on this disk', fmtSize(d.disk.free)),
         tile('Entries', String(d.entries.length), `${users.length} user(s)`),
-        tile('Retention', duration(d.retention), d.auth === 'proxy' ? 'proxy auth' : 'single user'),
+        tile('Retention', fmtSpan(d.retention), d.auth === 'proxy' ? 'proxy auth' : 'single user'),
       ].join('');
 
       const rows = d.entries.map(e => `
@@ -91,9 +67,9 @@
           <td class="col-owner">${esc(e.owner)}</td>
           <td class="col-title" title="${esc(e.title || e.url)}">${esc(e.title || e.url)}</td>
           <td>${esc(e.status)}</td>
-          <td class="num">${e.bytes ? esc(bytes(e.bytes)) : '—'}</td>
+          <td class="num">${e.bytes ? esc(fmtSize(e.bytes)) : '—'}</td>
           <td class="num">${esc(ago(e.created_at))}</td>
-          <td class="num">${e.has_file ? esc(duration(e.expires_in)) : '—'}</td>
+          <td class="num">${e.has_file ? esc(fmtSpan(e.expires_in)) : '—'}</td>
           <td><button class="row-btn" onclick="removeEntry('${e.job_id}')">Delete</button></td>
         </tr>`).join('');
 

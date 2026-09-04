@@ -1,20 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ReClip — Free Media Downloader</title>
-  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/style.css">
-  <script>
-    // Before first paint, or the page flashes light before the choice applies.
-    try {
-      var saved = localStorage.getItem('theme');
-      if (saved === 'dark' || saved === 'light') {
-        document.documentElement.dataset.theme = saved;
-      }
-    } catch (e) {}
-  </script>
+  {% set page_title = "ReClip" %}
+  {% include "_head.html" %}
 </head>
 <body>
   <div class="page">
@@ -49,6 +37,7 @@
     </div>
   </div>
 
+  <script src="/static/format.js"></script>
   <script>
     let currentFormat = 'video';
     let cardData = [];
@@ -78,20 +67,6 @@
       return [...new Set(text.split(/[\s,]+/).map(u => u.trim()).filter(u => u.startsWith('http')))];
     }
 
-    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-    function fmtDate(d) {
-      // yt-dlp gives YYYYMMDD as a string.
-      if (!d || d.length !== 8) return '';
-      return `${+d.slice(6)} ${MONTHS[+d.slice(4, 6) - 1]} ${d.slice(0, 4)}`;
-    }
-
-    function fmtSize(n) {
-      if (!n) return '';
-      return n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.round(n / 1e6)} MB`;
-    }
-
     /* Three qualities by default, the best three at or below 1440p: 4K costs a
        lot and shows little on the screens this ends up on. Everything else,
        4K included, is one click away behind the +N chip. */
@@ -110,32 +85,6 @@
     function defaultFormatId(formats) {
       // Whatever leads the row, so the default follows what is shown.
       return splitFormats(formats || []).visible[0]?.id || null;
-    }
-
-    function fmtDur(s) {
-      if (!s) return '';
-      const m = Math.floor(s / 60);
-      const sec = Math.floor(s % 60);
-      return `${m}:${sec.toString().padStart(2, '0')}`;
-    }
-
-    function esc(s) {
-      const d = document.createElement('div');
-      d.textContent = s;
-      return d.innerHTML;
-    }
-
-    function friendlyError(err) {
-      if (err.includes('Unsupported URL')) return 'This URL is not supported';
-      if (err.includes('Video unavailable')) return 'Video is unavailable or private';
-      if (err.includes('Private video')) return 'This video is private';
-      if (err.includes('HTTP Error 403')) return 'Access denied by the platform';
-      if (err.includes('HTTP Error 404')) return 'Video not found';
-      if (err.includes('copyright')) return 'Video blocked due to copyright';
-      if (err.includes('geo')) return 'Video not available in your region';
-      if (err.includes('timed out') || err.includes('Timed out')) return 'Request timed out — try again';
-      if (err.includes('network') || err.includes('Network')) return 'Network error — check your connection';
-      return err.length > 80 ? err.slice(0, 80) + '...' : err;
     }
 
     document.getElementById('urls').addEventListener('keydown', e => {

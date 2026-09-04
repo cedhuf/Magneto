@@ -25,6 +25,9 @@ DOWNLOAD_TIMEOUT = int(os.environ.get("RECLIP_DOWNLOAD_TIMEOUT", 20 * 60))
 # A playlist expansion costs one yt-dlp process per entry afterwards, so an
 # uncapped one is a way to bring the server down by pasting a link.
 PLAYLIST_MAX = int(os.environ.get("RECLIP_PLAYLIST_MAX", 50))
+# Videos kept per followed channel. Small on purpose: the feed is what is new,
+# not an archive, and every extra one is stored and rendered for every channel.
+FEED_VIDEOS = int(os.environ.get("RECLIP_FEED_VIDEOS", 3))
 # A pin does not exempt a file, it moves its deadline within a limit the admin
 # still owns. Otherwise the disk stops being bounded.
 PIN_RETENTION = int(os.environ.get("RECLIP_PIN_RETENTION", 30 * 24 * 3600))
@@ -385,12 +388,46 @@ def youtube_videos_url(url):
                                       query="", fragment=""))
 
 
-def fetch_channel(url):
-    """Return the five newest videos without opening every video separately."""
+def parse_ytdlp_lines(stdout):
+    """Every JSON object yt-dlp printed, keyed by video id.
+
+    With several URLs on one command line it prints one object per line, so a
+    batch of videos costs a single process instead of one each.
+    """
+    resolved = {}
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            info = json.loads(line)
+        except ValueError:
+            continue
+        if info.get("id"):
+            resolved[info["id"]] = info
+    return resolved
+
+
+def resolve_videos(urls):
+    if not urls:
+        return {}
+    cmd = ["yt-dlp", "--no-playlist", "-j", "--", *urls]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    return parse_ytdlp_lines(result.stdout)
+
+
+def fetch_channel(url, known=None):
+    """Return the newest videos of a channel, dated.
+
+    A flat listing is one quick call but YouTube leaves its entries without any
+    date at all, which is what the feed sorts on. So: list flat, then resolve
+    only the videos never seen before, which on a refresh is usually none.
+    """
     videos_url = youtube_videos_url(url)
     if not videos_url:
         raise ValueError("Please enter a YouTube channel URL")
-    cmd = ["yt-dlp", "--flat-playlist", "--playlist-end", "5", "-J", "--", videos_url]
+    cmd = ["yt-dlp", "--flat-playlist", "--playlist-end", str(FEED_VIDEOS),
+           "-J", "--", videos_url]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
     if result.returncode != 0:
         raise ValueError(result.stderr.strip().split("\n")[-1])
@@ -398,29 +435,40 @@ def fetch_channel(url):
     channel_id = info.get("channel_id") or info.get("id")
     if not channel_id:
         raise ValueError("Could not identify this YouTube channel")
-    videos = []
+
+    known = known or {}
+    entries = []
     for entry in info.get("entries") or []:
         video_id = entry.get("id")
         video_url = entry.get("webpage_url") or entry.get("url")
         if video_url and not video_url.startswith("http") and video_id:
             video_url = f"https://www.youtube.com/watch?v={video_id}"
         if video_url:
-            videos.append({
-                "url": video_url,
-                "title": entry.get("title") or "Untitled",
-                # Some playlist entries omit the thumbnail even though
-                # YouTube exposes a stable image for every video id.
-                "thumbnail": entry.get("thumbnail") or (
-                    f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg" if video_id else ""
-                ),
-                "upload_date": entry.get("upload_date") or (
-                    time.strftime("%Y%m%d", time.gmtime(entry["timestamp"]))
-                    if entry.get("timestamp") else ""
-                ),
-                "duration": entry.get("duration"),
-                "description": entry.get("description") or "",
-                "id": video_id or "",
-            })
+            entries.append((video_id or "", video_url, entry))
+
+    missing = [url for vid, url, _ in entries if vid not in known]
+    resolved = resolve_videos(missing)
+
+    videos = []
+    for video_id, video_url, entry in entries:
+        seen = known.get(video_id, {})
+        full = resolved.get(video_id, {})
+        upload_date = full.get("upload_date") or seen.get("upload_date") or ""
+        if not upload_date and full.get("timestamp"):
+            upload_date = time.strftime("%Y%m%d", time.gmtime(full["timestamp"]))
+        videos.append({
+            "url": video_url,
+            "title": entry.get("title") or full.get("title") or "Untitled",
+            # Playlist entries often omit the thumbnail even though YouTube
+            # exposes a stable image for every video id.
+            "thumbnail": entry.get("thumbnail") or full.get("thumbnail") or (
+                f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg" if video_id else ""
+            ),
+            "upload_date": upload_date,
+            "duration": entry.get("duration") or full.get("duration"),
+            "description": full.get("description") or seen.get("description") or "",
+            "id": video_id,
+        })
     return {
         "channel_id": str(channel_id),
         # Keep the Videos tab for later refreshes; the channel home page would
@@ -432,8 +480,16 @@ def fetch_channel(url):
     }
 
 
-def refresh_subscription(owner, url):
-    channel = fetch_channel(url)
+def refresh_subscription(owner, url, channel_id=None):
+    known = {}
+    if channel_id:
+        with connect() as conn:
+            row = conn.execute("SELECT videos FROM subscriptions "
+                               "WHERE owner = ? AND channel_id = ?",
+                               (owner, channel_id)).fetchone()
+        if row:
+            known = {v["id"]: v for v in json.loads(row["videos"]) if v.get("id")}
+    channel = fetch_channel(url, known)
     with connect() as conn:
         conn.execute("INSERT INTO subscriptions "
                      "(owner, channel_id, channel_url, title, thumbnail, videos, refreshed_at) "
@@ -499,17 +555,27 @@ def subscribe():
 
 @app.route("/api/feed/refresh", methods=["POST"])
 def refresh_feed():
+    """Refresh one channel per call.
+
+    Refreshing every channel in a single request took as long as the slowest
+    lookup times the channel count, with nothing on screen in the meantime and
+    the worker timeout waiting at the end of it.
+    """
     owner = current_user()
+    channel_id = (request.json or {}).get("channel_id")
     with connect() as conn:
-        urls = [row["channel_url"] for row in conn.execute(
-            "SELECT channel_url FROM subscriptions WHERE owner = ?", (owner,))]
-    errors = []
-    for url in urls:
-        try:
-            refresh_subscription(owner, url)
-        except Exception as e:
-            errors.append(str(e))
-    return jsonify({"ok": not errors, "error": errors[0] if errors else None})
+        row = conn.execute("SELECT channel_url FROM subscriptions "
+                           "WHERE owner = ? AND channel_id = ?",
+                           (owner, channel_id)).fetchone()
+    if row is None:
+        return jsonify({"error": "Unknown channel"}), 404
+    try:
+        refresh_subscription(owner, row["channel_url"], channel_id)
+        return jsonify({"ok": True})
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": "Timed out"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 
 @app.route("/api/feed/subscriptions/<channel_id>", methods=["DELETE"])

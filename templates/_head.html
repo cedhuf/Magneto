@@ -1,0 +1,16 @@
+{# One head for every page: the same metadata, the same stylesheet, and the
+   theme applied before first paint so nothing flashes. #}
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }}</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/style.css">
+<script>
+  // Before first paint, or the page flashes light before the choice applies.
+  try {
+    var saved = localStorage.getItem('theme');
+    if (saved === 'dark' || saved === 'light') {
+      document.documentElement.dataset.theme = saved;
+    }
+  } catch (e) {}
+</script>
