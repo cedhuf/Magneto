@@ -16,6 +16,7 @@
       <span id="accountCount"></span>
       <span class="feed-head-actions">
         <button class="link-btn" id="addBtn">Accounts</button>
+        <button class="link-btn" id="refreshBtn">Refresh all</button>
       </span>
     </div>
     {# The list lives in the folded panel rather than under the player: on a page
@@ -288,6 +289,7 @@
         ? `${clips.length} clip${clips.length === 1 ? '' : 's'} from ${accounts.length} account${accounts.length === 1 ? '' : 's'}`
         : 'No accounts yet';
       if (!accounts.length) document.getElementById('addPanel').hidden = false;
+      document.getElementById('refreshBtn').hidden = !accounts.length;
       document.getElementById('accountList').innerHTML = followRows(accounts);
     }
 
@@ -299,6 +301,8 @@
 
       wireFollowForm();
       wireImport();
+      document.getElementById('refreshBtn').addEventListener('click', e =>
+        refreshAll(e.target, accounts, 'Refresh all'));
     }
 
     /* The export is read here and never uploaded: it carries the account's

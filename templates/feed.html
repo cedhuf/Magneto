@@ -12,7 +12,7 @@
     <div class="feed-head" id="feedHead">
       <span id="videoCount"></span>
       <span class="feed-head-actions">
-        <button class="link-btn" id="addBtn">Add channels</button>
+        <button class="link-btn" id="addBtn">Channels</button>
         <button class="link-btn" id="layoutBtn">Grid</button>
         <button class="link-btn" id="settingsBtn">Settings</button>
         <button class="link-btn" id="refreshBtn">Refresh feed</button>
@@ -28,6 +28,7 @@
         <span>Or import subscriptions.csv from a YouTube export</span>
         <input type="file" id="importFile" accept=".csv,text/csv">
       </label>
+      <div class="channel-list" id="channelList"></div>
     </div>
     <div class="feed-panel feed-settings" id="settings" hidden>
       <label>Quality
@@ -39,10 +40,6 @@
     </div>
     <p class="hint" id="message" hidden></p>
     <div class="cards grid" id="videos"></div>
-    <div class="subscriptions" id="subscriptions" hidden>
-      <div class="history-head">Channels</div>
-      <div class="channel-list" id="channelList"></div>
-    </div>
   </div>
 
   <script src="/static/icons.js"></script>
@@ -104,7 +101,6 @@
       document.getElementById('refreshBtn').hidden = empty;
       if (empty) document.getElementById('addPanel').hidden = false;
       document.getElementById('channelList').innerHTML = followRows(data.channels);
-      document.getElementById('subscriptions').hidden = !data.channels.length;
     }
 
     /* One setting for the whole feed: it is a reading surface, so a quality is
@@ -177,37 +173,8 @@
       } catch (err) { message(friendlyError(err.message), true); }
       e.target.value = '';
     });
-    document.getElementById('refreshBtn').addEventListener('click', async () => {
-      const button = document.getElementById('refreshBtn');
-      button.disabled = true;
-      // One channel per request, so the wait is visible and no single call can
-      // outlive the worker timeout.
-      let done = 0, skipped = 0, failed = 0;
-      for (let i = 0; i < feedChannels.length; i++) {
-        button.textContent = `Refreshing ${i + 1}/${feedChannels.length}…`;
-        try {
-          const res = await fetch('/api/feed/refresh', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({channel_id: feedChannels[i].channel_id}),
-          });
-          const data = await res.json();
-          if (!res.ok) failed++;
-          else if (data.skipped) skipped++;
-          else done++;
-        } catch (e) { failed++; }
-      }
-      await load();
-      // Skipped is the normal case, not a failure: the server refuses to ask
-      // YouTube again about a channel it looked up a moment ago.
-      const parts = [];
-      if (done) parts.push(`${done} refreshed`);
-      if (skipped) parts.push(`${skipped} already fresh`);
-      if (failed) parts.push(`${failed} failed`);
-      message(parts.join(', ') || 'Nothing to refresh.', !!failed);
-      button.disabled = false;
-      button.textContent = 'Refresh feed';
-    });
+    document.getElementById('refreshBtn').addEventListener('click', e =>
+      refreshAll(e.target, feedChannels, 'Refresh feed'));
     /* Playing means downloading first, then using the app's own player on the
        app's own file. Never a YouTube embed: downloading first is what keeps
        the viewer on the instance. */

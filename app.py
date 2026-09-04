@@ -1366,6 +1366,10 @@ def refresh_feed():
     except subprocess.TimeoutExpired:
         return jsonify({"error": "Timed out"}), 400
     except Exception as e:
+        # Recorded like the poller's own failures, or a channel asked for by
+        # hand would keep saying it was never read and never say why.
+        note_failure({"channel_id": channel_id,
+                      "tab": "shorts" if upright else "videos"}, e)
         return jsonify({"error": str(e)}), 400
 
 

@@ -66,3 +66,35 @@ function wireFollowForm() {
     button.disabled = false; button.textContent = 'Add';
   });
 }
+
+/* Every followed account, one request each, so the wait is visible and no
+   single call can outlive the worker timeout. Spacing is not skipped here the
+   way it is for one deliberate click: this is a sweep, not an urgency. */
+async function refreshAll(button, items, label) {
+  button.disabled = true;
+  let done = 0, skipped = 0, failed = 0;
+  for (let i = 0; i < items.length; i++) {
+    button.textContent = `Refreshing ${i + 1}/${items.length}\u2026`;
+    try {
+      const res = await fetch('/api/feed/refresh', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({channel_id: items[i].channel_id}),
+      });
+      const data = await res.json();
+      if (!res.ok) failed++;
+      else if (data.skipped) skipped++;
+      else done++;
+    } catch (e) { failed++; }
+  }
+  await load();
+  // Skipped is the normal case, not a failure: the server refuses to ask again
+  // about an account it looked up a moment ago.
+  const parts = [];
+  if (done) parts.push(`${done} refreshed`);
+  if (skipped) parts.push(`${skipped} already fresh`);
+  if (failed) parts.push(`${failed} failed`);
+  message(parts.join(', ') || 'Nothing to refresh.', !!failed);
+  button.disabled = false;
+  button.textContent = label;
+}

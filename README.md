@@ -48,10 +48,12 @@ docker build -t reclip . && docker run -p 8899:8899 reclip
 ### Feed
 
 Open **Feed** to follow YouTube channels. ReClip stores each channel's latest
-videos and merges them into a compact, newest-first grid. **Add channels** takes
-a channel URL, or the `subscriptions.csv` of a YouTube export: importing follows
-every channel at once and looks none of them up, so the poller fills them one at
-a time instead of asking YouTube a hundred times in one breath. **Settings** sets
+videos and merges them into a compact, newest-first grid. **Channels** takes a
+channel URL, or the `subscriptions.csv` of a YouTube export, and holds the list
+of what you follow: importing follows every channel at once and looks none of
+them up, so the poller fills them one at a time instead of asking YouTube a
+hundred times in one breath. Each row says when that channel was last read, and
+says so plainly when it turned out to have no Videos tab at all. **Settings** sets
 the quality and how many videos to keep per channel, for the whole feed rather
 than per video: a feed is read more than it is archived. **Refresh feed** updates
 one channel per request, so the wait is visible. Each channel in the list below
@@ -79,8 +81,8 @@ per-video lookup, and it takes one place in the refresh queue rather than two
 since it has no long videos. The switch is independent: the page works with the
 feed off.
 
-**Accounts** takes an account URL, or the `user_data_tiktok.json` of a TikTok
-export. That file is read in the browser and never uploaded: it carries the
+**Accounts** holds the same block as the feed's: an account URL, or the
+`user_data_tiktok.json` of a TikTok export, and the list of what you follow. That file is read in the browser and never uploaded: it carries the
 account's phone number, address and email a couple of keys away from the list of
 accounts, and only the handles are sent. As with the YouTube import, nothing is
 looked up: every account is followed at once and the poller fills them one at a
