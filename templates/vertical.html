@@ -11,14 +11,17 @@
   <div class="page">
     {% include "_header.html" %}
 
-    {% if manage %}
     <div class="feed-head" id="feedHead">
       <span id="accountCount"></span>
       <span class="feed-head-actions">
+        {% if manage %}
         <button class="link-btn" id="addBtn">Accounts</button>
         <button class="link-btn" id="refreshBtn">Refresh all</button>
+        {% endif %}
+        <button class="link-btn" id="watchedBtn">Show watched</button>
       </span>
     </div>
+    {% if manage %}
     {# The list lives in the folded panel rather than under the player: on a page
        whose whole point is one full-height video, a permanent block below it is
        height taken from the video. #}
@@ -52,8 +55,8 @@
         </div>
       </div>
       <div class="engraved" id="empty" hidden>
-        <div class="engraved-title">Nothing to watch</div>
-        <p class="engraved-note">{{ empty_note }}</p>
+        <div class="engraved-title" id="emptyTitle">Nothing to watch</div>
+        <p class="engraved-note" id="emptyNote">{{ empty_note }}</p>
       </div>
       <p class="hint" id="message" hidden></p>
     </div>
@@ -68,12 +71,19 @@
   <script>
     const FOLLOWED = {noun: 'Account', add: '/api/tiktok/accounts'};
     const SOURCE = {{ source | tojson }};
+    /* A clip left behind is watched, whatever it lasted: any threshold would
+       need a timer and a rule about a paused tab, and arriving on one is
+       already the act that downloads it. Show watched asks for the lot. */
+    let watched = false;
+    let reading = -1;
+    let hidden = 0;
     /* A touch screen has no hover, so the browser shows its own controls on
        every new clip and leaves them there for seconds. On a clip that lasts
        ten, that is most of it. There, the video is read with a tap and a line
        says where it is. */
     const TAP = matchMedia('(hover: none)').matches;
     const MANAGE = {{ manage | tojson }};
+    const EMPTY_NOTE = {{ empty_note | tojson }};
     let clips = [];
     let accounts = [];
     let at = 0;
@@ -88,17 +98,19 @@
     }
 
     async function load() {
-      const res = await fetch(SOURCE);
+      const res = await fetch(watched ? `${SOURCE}?watched=1` : SOURCE);
       if (!res.ok) return;
       const data = await res.json();
       clips = data.clips;
       accounts = data.accounts || [];
       quality = data.quality;
       sharing = data.share;
+      hidden = data.hidden;
       at = Math.min(at, Math.max(0, clips.length - 1));
       document.getElementById('prevBtn').innerHTML = icon('up');
       document.getElementById('nextBtn').innerHTML = icon('down');
       if (MANAGE) renderAccounts();
+      renderCount();
       render();
     }
 
@@ -154,6 +166,8 @@
     function show() {
       const clip = clips[at];
       if (!clip) return;
+      if (reading >= 0 && reading !== at && clips[reading]) markSeen(clips[reading].url);
+      reading = at;
       document.getElementById('prevBtn').disabled = at === 0;
       document.getElementById('nextBtn').disabled = at === clips.length - 1;
       document.getElementById('title').textContent = clip.title;
@@ -186,6 +200,41 @@
       // every extra one is a video nobody has asked to watch.
       if (clips[at + 1] && !clips[at + 1].job_id) fetchClip(at + 1, false);
     }
+
+    function markSeen(url) {
+      fetch('/api/seen', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({url}),
+      }).catch(() => {});
+    }
+
+    /* The bar says what the reel holds, and the empty card has two things to
+       say: nothing followed yet, or everything watched. */
+    function renderCount() {
+      const clipCount = `${clips.length} clip${clips.length === 1 ? '' : 's'}`;
+      document.getElementById('accountCount').textContent = MANAGE
+        ? (accounts.length
+            ? `${clipCount} from ${accounts.length} account${accounts.length === 1 ? '' : 's'}`
+            : 'No accounts yet')
+        : clipCount;
+      const button = document.getElementById('watchedBtn');
+      button.textContent = watched ? 'Hide watched' : 'Show watched';
+      button.hidden = !watched && !hidden && !clips.length;
+      const caughtUp = !clips.length && hidden > 0;
+      document.getElementById('emptyTitle').textContent =
+        caughtUp ? 'You are up to date' : 'Nothing to watch';
+      document.getElementById('emptyNote').textContent = caughtUp
+        ? 'Everything listed has been watched. New clips arrive as the accounts come round.'
+        : EMPTY_NOTE;
+    }
+
+    document.getElementById('watchedBtn').addEventListener('click', async () => {
+      watched = !watched;
+      at = 0;
+      reading = -1;
+      await load();
+    });
 
     function wireTap(video) {
       video.addEventListener('click', () => video.paused ? video.play() : video.pause());
@@ -285,9 +334,6 @@
     /* Only the pages that own their accounts manage them: shorts come from the
        channels the feed page follows, TikTok accounts belong here. */
     function renderAccounts() {
-      document.getElementById('accountCount').textContent = accounts.length
-        ? `${clips.length} clip${clips.length === 1 ? '' : 's'} from ${accounts.length} account${accounts.length === 1 ? '' : 's'}`
-        : 'No accounts yet';
       if (!accounts.length) document.getElementById('addPanel').hidden = false;
       document.getElementById('refreshBtn').hidden = !accounts.length;
       document.getElementById('accountList').innerHTML = followRows(accounts);

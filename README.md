@@ -72,6 +72,16 @@ is fetched while you watch, and both are gone after `RECLIP_SHORTS_RETENTION`.
 They stay out of the downloads list and out of the history ceiling, and `/admin`
 shows them as one line with a purge of their own.
 
+A clip is watched once you leave it, whatever it lasted, and a watched clip
+drops out of the reel: scrolling never walks back through it, and a reload does
+not fetch it again. The one you are on stays unwatched, so a reload puts you
+back on it. **Show watched** brings the whole list back when you want to find
+something again, and an empty reel says whether nothing is followed or
+everything has been watched. It is recorded per account on the server rather
+than in the browser, so a phone and a laptop agree, and forgotten after
+`RECLIP_SEEN_RETENTION`: a clip that has fallen out of every listing can never
+come back into the reel, so the row stops meaning anything.
+
 ### TikTok
 
 **TikTok** is the same player with its own accounts, added from that page and
@@ -250,7 +260,8 @@ date rather than stored.
 | `RECLIP_SHARE` | `0` | Public share links. Off unless asked for, and it does nothing until the reverse proxy stops asking for authentication on `/s/` |
 | `RECLIP_SHARE_TTL` | `172800` | Seconds a share link works. The link is the whole credential and can be forwarded, so this is the real limit on who ends up watching |
 | `RECLIP_SHARE_MAX` | `10` | Live links one account may hold at a time. Expired ones do not count |
-| `RECLIP_SHORTS_RETENTION` | `3600` | Seconds a watched short is kept. It is fetched to be watched once, so it does not need the deadline a download gets, and it is never pinned |
+| `RECLIP_SHORTS_RETENTION` | `86400` | Seconds a fetched short or TikTok clip is kept. A watched clip leaves the reel, so what this holds is one person's day of watching rather than everything their accounts list. Never pinned, and out of the history ceiling |
+| `RECLIP_SEEN_RETENTION` | `604800` | Seconds a "watched" row is kept. Past the point where the clip has left every listing, the row can no longer hide anything |
 | `RECLIP_FEED_VIDEOS` | `5` | Ceiling for the per-user feed setting, not the setting itself |
 | `RECLIP_FEED_POLL` | `300` | Seconds between two channel lookups, for the whole instance |
 | `RECLIP_FEED_TTL` | `21600` | Age at which a cached channel is worth looking up again |

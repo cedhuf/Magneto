@@ -55,9 +55,15 @@ FEED_ENABLED = enabled("RECLIP_FEED")
 # Shorts come from the channels followed on the feed page, so there is nothing
 # to show without it.
 SHORTS_ENABLED = FEED_ENABLED and enabled("RECLIP_SHORTS")
-# A short is downloaded when it is watched and needed only for that. An hour
-# outlives a session and nothing more.
-SHORTS_RETENTION = int(os.environ.get("RECLIP_SHORTS_RETENTION", 3600))
+# A short is downloaded when it is watched, and a watched clip leaves the reel,
+# so what the disk holds is what one person actually watched in a day rather
+# than everything their accounts listed. That is bounded by use, which is why
+# this can sit at the same day as a download instead of an hour.
+SHORTS_RETENTION = int(os.environ.get("RECLIP_SHORTS_RETENTION", 24 * 3600))
+# A clip that has fallen out of every listing can never come back into the reel,
+# so the row saying it was watched stops meaning anything. A week is far past
+# the point where that is true for every account.
+SEEN_RETENTION = int(os.environ.get("RECLIP_SEEN_RETENTION", 7 * 24 * 3600))
 # TikTok has its own page, its own accounts and its own switch: it shares the
 # player and the outbound budget with the shorts page, nothing else.
 TIKTOK_ENABLED = enabled("RECLIP_TIKTOK")
@@ -215,6 +221,14 @@ MIGRATIONS = [
     """
     ALTER TABLE channels ADD COLUMN has_videos INTEGER NOT NULL DEFAULT 1;
     ALTER TABLE channels ADD COLUMN has_shorts INTEGER NOT NULL DEFAULT 1;
+    """,
+    """
+    CREATE TABLE seen (
+        owner TEXT NOT NULL,
+        url   TEXT NOT NULL,
+        at    REAL NOT NULL,
+        PRIMARY KEY (owner, url)
+    );
     """,
 ]
 
@@ -449,6 +463,7 @@ def sweep_downloads():
     """
     now = time.time()
     with connect() as conn:
+        conn.execute("DELETE FROM seen WHERE at < ?", (now - SEEN_RETENTION,))
         # A file can be referenced by several entries, so the deadline is keyed
         # by path and the most generous reference wins: nobody's pin may be
         # undone by somebody else's expiry.
@@ -982,6 +997,8 @@ def gate_optional_pages():
     shared = ("/api/feed/subscriptions", "/api/feed/refresh")
     if not (FEED_ENABLED or TIKTOK_ENABLED) and path.startswith(shared):
         abort(404)
+    if not (SHORTS_ENABLED or TIKTOK_ENABLED) and path == "/api/seen":
+        abort(404)
 
 
 @app.route("/")
@@ -1067,20 +1084,25 @@ def tiktok_page():
 @app.route("/api/tiktok")
 def tiktok_list():
     """The followed accounts and their videos, newest of each in turn."""
-    return jsonify(upright_clips(current_user(), "tiktok", with_accounts=True))
+    return jsonify(upright_clips(current_user(), "tiktok", with_accounts=True,
+                                 watched=request.args.get("watched") == "1"))
 
 
 @app.route("/api/shorts")
 def shorts_list():
-    return jsonify(upright_clips(current_user(), "youtube"))
+    return jsonify(upright_clips(current_user(), "youtube",
+                                 watched=request.args.get("watched") == "1"))
 
 
-def upright_clips(owner, platform, with_accounts=False):
+def upright_clips(owner, platform, with_accounts=False, watched=False):
     """Every followed account's upright videos, one from each in turn.
 
     A round is one video per account, so nobody takes the top of the page, and
     it costs no date: these lists are already newest first, and dating them
     would mean asking the player API about every one of them.
+
+    What has been watched is left out, so scrolling never walks back through it
+    and a reload does not fetch it again. Show watched asks for the lot.
     """
     settings = get_settings(owner)
     with connect() as conn:
@@ -1097,12 +1119,22 @@ def upright_clips(owner, platform, with_accounts=False):
             "SELECT url, job_id, path FROM entries WHERE variant = ? AND status = 'done' "
             "AND path IS NOT NULL", (variant,)) if os.path.exists(r["path"])}
 
+    with connect() as conn:
+        seen = {r["url"] for r in conn.execute(
+            "SELECT url FROM seen WHERE owner = ?", (owner,))}
+
     shared = set(live_shares())
     lists = []
+    hidden = 0
     for row in rows:
         clips = json.loads(row["shorts"])[:settings["videos"]]
+        if not watched:
+            kept = [clip for clip in clips if clip["url"] not in seen]
+            hidden += len(clips) - len(kept)
+            clips = kept
         lists.append([{**clip, "uploader": row["title"], "platform": row["platform"],
                        "job_id": ready.get(clip["url"]),
+                       "seen": clip["url"] in seen,
                        "shared": ready.get(clip["url"]) in shared} for clip in clips])
 
     interleaved = []
@@ -1110,13 +1142,31 @@ def upright_clips(owner, platform, with_accounts=False):
         for one in lists:
             if rank < len(one):
                 interleaved.append(one[rank])
+    # How many were left out, so an empty reel can say "you are up to date"
+    # rather than "follow some accounts".
     payload = {"clips": interleaved, "quality": settings["quality"],
-               "share": SHARE_ENABLED}
+               "share": SHARE_ENABLED, "hidden": hidden, "watched": watched}
     if with_accounts:
         payload["accounts"] = [{"channel_id": r["channel_id"], "title": r["title"],
                                 "fetched": r["shorts_refreshed_at"],
                                 "failed": not r["has_shorts"]} for r in rows]
     return payload
+
+
+@app.route("/api/seen", methods=["POST"])
+def mark_seen():
+    """Recorded when a clip is left, never when it is reached: the one being
+    watched is not finished, and leaving it unmarked is what puts the reader
+    back on it after a reload."""
+    owner = current_user()
+    url = (request.json or {}).get("url", "")
+    if not isinstance(url, str) or not url.strip():
+        return jsonify({"error": "No clip"}), 400
+    with connect() as conn:
+        conn.execute("INSERT INTO seen (owner, url, at) VALUES (?, ?, ?) "
+                     "ON CONFLICT(owner, url) DO UPDATE SET at = excluded.at",
+                     (owner, url.strip(), time.time()))
+    return jsonify({"ok": True})
 
 
 @app.route("/api/feed/settings", methods=["POST"])
