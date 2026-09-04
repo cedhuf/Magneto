@@ -56,14 +56,20 @@ SHORTS_ENABLED = FEED_ENABLED and enabled("RECLIP_SHORTS")
 # A short is downloaded when it is watched and needed only for that. An hour
 # outlives a session and nothing more.
 SHORTS_RETENTION = int(os.environ.get("RECLIP_SHORTS_RETENTION", 3600))
-# TikTok accounts are followed like channels and read on the shorts page: it is
-# the same thing, an upright video watched once.
-TIKTOK_ENABLED = SHORTS_ENABLED and enabled("RECLIP_TIKTOK")
+# TikTok has its own page, its own accounts and its own switch: it shares the
+# player and the outbound budget with the shorts page, nothing else.
+TIKTOK_ENABLED = enabled("RECLIP_TIKTOK")
 # A pin does not exempt a file, it moves its deadline within a limit the admin
 # still owns. Otherwise the disk stops being bounded.
 PIN_RETENTION = int(os.environ.get("RECLIP_PIN_RETENTION", 30 * 24 * 3600))
 HISTORY_MAX = int(os.environ.get("RECLIP_HISTORY_MAX", 200))
 SWEEP_INTERVAL = 60
+
+# The commit this image was built from, stamped at build time. Falling back to
+# the date of the code itself is enough to answer the only question anyone asks
+# of it: is what I am looking at the version I just deployed?
+VERSION = os.environ.get("RECLIP_VERSION") or time.strftime(
+    "%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(__file__)))
 
 # YouTube judges an IPv6 prefix on the whole neighbourhood behind it, so a host
 # that has never asked for anything is refused with "Sign in to confirm you're
@@ -454,16 +460,27 @@ def stalest_slot():
     not double how often YouTube is asked.
     """
     cutoff = time.time() - FEED_TTL
-    # A TikTok account has no Videos tab, so it takes one place in the queue
-    # rather than two: what it has is what the shorts page reads.
-    queue = ["SELECT c.channel_id, c.channel_url, c.platform, 'videos' AS tab, "
-             "c.refreshed_at AS age FROM channels c "
-             "JOIN follows f ON f.channel_id = c.channel_id "
-             "WHERE c.platform = 'youtube'"]
+    # One queue, whatever is enabled. A YouTube channel holds two places, its
+    # Videos tab and its Shorts tab; a TikTok account holds one, since it has no
+    # long videos. A page that is off puts nothing in the queue at all.
+    queue = []
+    if FEED_ENABLED:
+        queue.append("SELECT c.channel_id, c.channel_url, c.platform, 'videos' AS tab, "
+                     "c.refreshed_at AS age FROM channels c "
+                     "JOIN follows f ON f.channel_id = c.channel_id "
+                     "WHERE c.platform = 'youtube'")
     if SHORTS_ENABLED:
-        queue.append("SELECT c.channel_id, c.channel_url, c.platform, 'shorts', "
-                     "c.shorts_refreshed_at FROM channels c "
-                     "JOIN follows f ON f.channel_id = c.channel_id")
+        queue.append("SELECT c.channel_id, c.channel_url, c.platform, 'shorts' AS tab, "
+                     "c.shorts_refreshed_at AS age FROM channels c "
+                     "JOIN follows f ON f.channel_id = c.channel_id "
+                     "WHERE c.platform = 'youtube'")
+    if TIKTOK_ENABLED:
+        queue.append("SELECT c.channel_id, c.channel_url, c.platform, 'shorts' AS tab, "
+                     "c.shorts_refreshed_at AS age FROM channels c "
+                     "JOIN follows f ON f.channel_id = c.channel_id "
+                     "WHERE c.platform = 'tiktok'")
+    if not queue:
+        return None
     with connect() as conn:
         # A tie goes to the tab that did not go last. Freshly imported channels
         # are all dated zero, so without this the queue does every Videos tab
@@ -882,6 +899,12 @@ def gate_optional_pages():
         abort(404)
     if not SHORTS_ENABLED and (path == "/shorts" or path.startswith("/api/shorts")):
         abort(404)
+    if not TIKTOK_ENABLED and (path == "/tiktok" or path.startswith("/api/tiktok")):
+        abort(404)
+    # Removing and refreshing a followed account is the same route whichever
+    # page follows it, so it opens as soon as one of them is on.
+    if not (FEED_ENABLED or TIKTOK_ENABLED) and path.startswith("/api/feed/subscriptions"):
+        abort(404)
 
 
 @app.route("/")
@@ -941,24 +964,49 @@ def feed():
 
 @app.route("/shorts")
 def shorts_page():
-    return render_template("shorts.html", page="shorts", **page_context())
+    return render_template(
+        "vertical.html", page="shorts", heading="Shorts",
+        tagline="Shorts from your channels", source="/api/shorts", manage=False,
+        empty_note="Follow channels on the feed page, then wait for their shorts "
+                   "to be listed. One channel comes round every few minutes.",
+        **page_context())
+
+
+@app.route("/tiktok")
+def tiktok_page():
+    return render_template(
+        "vertical.html", page="tiktok", heading="TikTok",
+        tagline="The accounts you follow", source="/api/tiktok", manage=True,
+        empty_note="Add a TikTok account above. Its latest videos are listed "
+                   "shortly after, and fetched only when you watch one.",
+        **page_context())
+
+
+@app.route("/api/tiktok")
+def tiktok_list():
+    """The followed accounts and their videos, newest of each in turn."""
+    return jsonify(upright_clips(current_user(), "tiktok", with_accounts=True))
 
 
 @app.route("/api/shorts")
 def shorts_list():
-    """Every followed channel's shorts, one from each in turn.
+    return jsonify(upright_clips(current_user(), "youtube"))
 
-    A round is one short per channel, so no channel takes the top of the page,
-    and it costs no date: the shorts tab is already newest first, and dating
-    them would mean asking the player API about every one of them.
+
+def upright_clips(owner, platform, with_accounts=False):
+    """Every followed account's upright videos, one from each in turn.
+
+    A round is one video per account, so nobody takes the top of the page, and
+    it costs no date: these lists are already newest first, and dating them
+    would mean asking the player API about every one of them.
     """
-    owner = current_user()
     settings = get_settings(owner)
     with connect() as conn:
         rows = conn.execute(
-            "SELECT c.title, c.shorts, c.platform FROM channels c "
+            "SELECT c.channel_id, c.title, c.shorts, c.platform FROM channels c "
             "JOIN follows f ON f.channel_id = c.channel_id "
-            "WHERE f.owner = ? ORDER BY c.title COLLATE NOCASE", (owner,)).fetchall()
+            "WHERE f.owner = ? AND c.platform = ? "
+            "ORDER BY c.title COLLATE NOCASE", (owner, platform)).fetchall()
 
     variant = variant_of("video", None, settings["quality"], vertical=True)
     with connect() as conn:
@@ -968,16 +1016,20 @@ def shorts_list():
 
     lists = []
     for row in rows:
-        shorts = json.loads(row["shorts"])[:settings["videos"]]
-        lists.append([{**short, "uploader": row["title"], "platform": row["platform"],
-                       "job_id": ready.get(short["url"])} for short in shorts])
+        clips = json.loads(row["shorts"])[:settings["videos"]]
+        lists.append([{**clip, "uploader": row["title"], "platform": row["platform"],
+                       "job_id": ready.get(clip["url"])} for clip in clips])
 
     interleaved = []
     for rank in range(max((len(one) for one in lists), default=0)):
         for one in lists:
             if rank < len(one):
                 interleaved.append(one[rank])
-    return jsonify({"shorts": interleaved, "quality": settings["quality"]})
+    payload = {"clips": interleaved, "quality": settings["quality"]}
+    if with_accounts:
+        payload["accounts"] = [{"channel_id": r["channel_id"], "title": r["title"]}
+                               for r in rows]
+    return payload
 
 
 @app.route("/api/feed/settings", methods=["POST"])
@@ -995,20 +1047,35 @@ def feed_settings():
 
 @app.route("/api/feed/subscriptions", methods=["POST"])
 def subscribe():
-    """Follow a channel, from whichever platform its URL names."""
     owner = current_user()
     url = (request.json or {}).get("url", "").strip()
-    tiktok = TIKTOK_ENABLED and tiktok_user_url(url)
-    if not is_safe_url(url) or not (tiktok or youtube_videos_url(url)):
-        return jsonify({"error": "Please enter a YouTube channel URL"
-                        + (" or a TikTok account" if TIKTOK_ENABLED else "")}), 400
+    if not is_safe_url(url) or not youtube_videos_url(url):
+        return jsonify({"error": "Please enter a YouTube channel URL"}), 400
+    return follow(owner, url, refresh_channel)
+
+
+@app.route("/api/tiktok/accounts", methods=["POST"])
+def add_tiktok_account():
+    owner = current_user()
+    url = (request.json or {}).get("url", "").strip()
+    if not is_safe_url(url) or not tiktok_user_url(url):
+        return jsonify({"error": "Please enter a TikTok account URL"}), 400
+    return follow(owner, url, follow_tiktok)
+
+
+def follow(owner, url, fetch):
+    """Record who someone follows, whatever page they follow it from.
+
+    The ceiling counts every source together: what it protects is the outbound
+    rate, which is shared, not a page.
+    """
     with connect() as conn:
         followed = conn.execute("SELECT count(*) FROM follows WHERE owner = ?",
                                 (owner,)).fetchone()[0]
     if followed >= FEED_CHANNELS_MAX:
         return jsonify({"error": f"At most {FEED_CHANNELS_MAX} channels"}), 400
     try:
-        channel = follow_tiktok(url) if tiktok else refresh_channel(url)
+        channel = fetch(url)
     except subprocess.TimeoutExpired:
         return jsonify({"error": "Timed out fetching channel"}), 400
     except Exception as e:
@@ -1185,6 +1252,7 @@ def admin_overview():
                         "created_at": row["created_at"], "bytes": size})
 
     return jsonify({
+        "version": VERSION,
         "retention": RETENTION,
         "auth": AUTH_MODE,
         "pinned": {"entries": len(pinned),
@@ -1532,7 +1600,7 @@ def download_file(job_id):
 # Started last: the poller reaches for everything below it, and a thread that
 # outruns its own module is a bug waiting for a slow import. Not started at all
 # when the feed is off: nothing must talk to YouTube on its own then.
-if FEED_ENABLED:
+if FEED_ENABLED or TIKTOK_ENABLED:
     threading.Thread(target=feed_poller, daemon=True).start()
 
 

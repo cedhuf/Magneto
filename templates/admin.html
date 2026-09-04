@@ -79,7 +79,7 @@
         tile('Taken by downloads', fmtSize(d.disk.bytes), `${d.disk.files} file(s) on disk`),
         tile('Free on this disk', fmtSize(d.disk.free)),
         tile('Entries', String(d.entries.length), `${users.length} user(s)`),
-        tile('Retention', fmtSpan(d.retention), d.auth === 'proxy' ? 'proxy auth' : 'single user'),
+        tile('Retention', fmtSpan(d.retention), `${d.auth === 'proxy' ? 'proxy auth' : 'single user'} · build ${d.version}`),
         // The only thing here that outlives the ordinary deadline, so the only
         // thing that can grow the disk without anybody deciding to.
         tile('Pinned', fmtSize(d.pinned.bytes) || '0 MB',

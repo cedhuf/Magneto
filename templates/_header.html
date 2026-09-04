@@ -24,6 +24,9 @@
     {% if shorts %}
       <a class="text-btn{{ ' active' if page == 'shorts' }}" href="/shorts">Shorts</a>
     {% endif %}
+    {% if tiktok %}
+      <a class="text-btn{{ ' active' if page == 'tiktok' }}" href="/tiktok">TikTok</a>
+    {% endif %}
     {% if auth == 'proxy' and logout_url %}
       <a class="text-btn" href="{{ logout_url }}">Sign out</a>
     {% endif %}

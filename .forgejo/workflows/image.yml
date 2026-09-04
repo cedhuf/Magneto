@@ -36,6 +36,7 @@ jobs:
           podman build \
             --label "org.opencontainers.image.source=https://git.thehuf.uk/$GITHUB_REPOSITORY" \
             --label "org.opencontainers.image.revision=$SHA" \
+            --build-arg "RECLIP_VERSION=$SHA" \
             $TAGS .
 
       - name: Push

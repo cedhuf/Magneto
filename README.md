@@ -70,10 +70,14 @@ is fetched while you watch, and both are gone after `RECLIP_SHORTS_RETENTION`.
 They stay out of the downloads list and out of the history ceiling, and `/admin`
 shows them as one line with a purge of their own.
 
-With `RECLIP_TIKTOK`, the same page also plays TikTok accounts: paste one on the
-feed page like any channel. TikTok lists more than YouTube does, a duration and
-a date included, so an account is one listing and never a per-video lookup, and
-it takes one place in the queue rather than two since it has no long videos.
+### TikTok
+
+**TikTok** is the same player with its own accounts, added from that page and
+kept apart from the YouTube channels of the feed. TikTok lists more than YouTube
+does, a duration and a date included, so an account is one listing and never a
+per-video lookup, and it takes one place in the refresh queue rather than two
+since it has no long videos. The switch is independent: the page works with the
+feed off.
 
 The shorts tab of a channel is a second listing, so a channel takes two places
 in the refresh queue instead of one. The outbound rate is unchanged, one lookup
@@ -164,7 +168,7 @@ date rather than stored.
 | `RECLIP_PLAYLIST_MAX` | `50` | Most videos one pasted playlist may expand to |
 | `RECLIP_FEED` | `0` | The feed page, and with it the only thread that asks YouTube anything on its own. Off unless asked for |
 | `RECLIP_SHORTS` | `0` | The shorts page. Shorts come from the channels followed on the feed, so this does nothing while `RECLIP_FEED` is off |
-| `RECLIP_TIKTOK` | `0` | Follow TikTok accounts too. Their videos are read on the shorts page, so this does nothing while `RECLIP_SHORTS` is off |
+| `RECLIP_TIKTOK` | `0` | The TikTok page: its own accounts, its own tab, the same player as the shorts page. Independent of `RECLIP_FEED` and `RECLIP_SHORTS` |
 | `RECLIP_SHORTS_RETENTION` | `3600` | Seconds a watched short is kept. It is fetched to be watched once, so it does not need the deadline a download gets, and it is never pinned |
 | `RECLIP_FEED_VIDEOS` | `5` | Ceiling for the per-user feed setting, not the setting itself |
 | `RECLIP_FEED_POLL` | `300` | Seconds between two channel lookups, for the whole instance |
@@ -180,6 +184,10 @@ date rather than stored.
 | `HOST` / `PORT` | `127.0.0.1` / `8899` | Only used by `python app.py` and `reclip.sh`. The image goes through gunicorn and reads `RECLIP_BIND` |
 
 ### Admin
+
+The version an instance runs is stamped into the image at build time and shown
+in `/admin`, next to the retention: that is the answer to "is the fix I just
+pushed the one I am looking at".
 
 `/admin` shows what the instance holds: space taken, space left, entries and
 size per user, and every entry with its age and remaining time. It deletes one

@@ -371,14 +371,20 @@ textarea::placeholder { color: var(--muted); }
   margin: 10px 12px 12px;
 }
 /* Laid down, the icons must not be squeezed by the action taking all it can,
-   nor pushed out of a block that hides what overflows it. They keep a size a
-   finger can hit, and the label gives way instead. */
+   nor pushed out of a block that hides what overflows it.
+
+   Sized by width and not by flex-basis, which is the whole point: measuring a
+   nested flex container, engines ask its children for their content width and
+   ignore the basis they were given (flexbugs #223, Mozilla 1179454). This row
+   was measured at 31px, the width of two icons and no buttons, so the action
+   took the rest and the delete fell outside a block that hides what overflows.
+   A width is read by that measurement; a basis is not. */
 .cards.grid .card-icons {
   flex: 0 0 auto;
   border-top: none;
   border-left: 1.5px solid var(--card-border);
 }
-.cards.grid .card-icons .icon-btn { flex: 0 0 40px; }
+.cards.grid .card-icons .icon-btn { flex: none; width: 42px; }
 .cards.grid .card-side .card-dl-btn {
   display: block;
   min-width: 0;
@@ -1134,7 +1140,7 @@ audio.modal-media {
     border-top: none;
     border-left: 1.5px solid var(--card-border);
   }
-  .card-icons .icon-btn { flex: 0 0 46px; }
+  .card-icons .icon-btn { flex: none; width: 46px; }
   .card-side .card-dl-btn {
     display: block;
     min-width: 0;
@@ -1172,8 +1178,10 @@ audio.modal-media {
 .icon-btn:hover { color: var(--fg); border-color: var(--card-border); }
 
 /* The width is set for the longest of the two labels, and the page is
-   border-box, where a min-width would have been eaten by the padding. */
-.del-btn { box-sizing: content-box; }
+   border-box, where a min-width would have been eaten by the padding. Only the
+   labelled shape has labels: an icon is square and must stay the size of its
+   neighbours. */
+.del-btn:not(.icon-btn) { box-sizing: content-box; }
 
 /* Armed by a first click: the next one deletes. Red is a state here, not a
    hover, so it must beat the hover rules of both shapes. */

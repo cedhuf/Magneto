@@ -16,6 +16,11 @@ RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
 COPY . .
 
+# Which commit this image was built from, so the running instance can say what
+# it is rather than leaving anyone to guess whether a fix is deployed.
+ARG RECLIP_VERSION=unknown
+ENV RECLIP_VERSION=$RECLIP_VERSION
+
 RUN useradd -m -u 1000 reclip && \
     mkdir -p /app/downloads /app/data && \
     chown -R reclip:reclip /app
