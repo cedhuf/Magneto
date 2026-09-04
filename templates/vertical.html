@@ -32,7 +32,7 @@
 
     <div class="shorts{{ ' manage' if manage }}" id="stage">
       <div class="shorts-frame" id="frame" hidden>
-        <div class="shorts-media" id="media"></div>
+        <div class="shorts-reel" id="reel"></div>
         <div class="shorts-rail">
           <button class="round-btn" id="prevBtn" onclick="step(-1)"
                   title="Previous (up arrow)" aria-label="Previous"></button>
@@ -95,35 +95,80 @@
     }
 
     /* One at a time, and the file is the instance's own: an upright video is
-       played the way everything else here is, never through an embed. */
+       played the way everything else here is, never through an embed.
+
+       The reel is a scrolling column of slides, one per clip, and the browser
+       does the reading: its own snapping stops on every slide, follows the
+       finger on a phone and the trackpad's inertia on a laptop. Nothing here
+       measures a gesture. Only the slide being watched carries a <video>. */
+    const reel = document.getElementById('reel');
+    let slides = [];
+    let mounted = -1;
+    let watcher = null;
+
+    function poster(clip) {
+      return `<div class="shorts-poster">
+          ${clip.thumbnail ? `<img src="${esc(clip.thumbnail)}" alt="">` : ''}
+          <span class="shorts-note">${clip.job_id ? '' : 'Fetching\u2026'}</span>
+        </div>`;
+    }
+
     function render() {
+      document.getElementById('frame').hidden = !clips.length;
+      document.getElementById('empty').hidden = !!clips.length;
+      slides = clips.map((clip, index) => {
+        const slide = document.createElement('div');
+        slide.className = 'shorts-slide';
+        slide.dataset.at = index;
+        slide.innerHTML = poster(clip);
+        return slide;
+      });
+      mounted = -1;
+      reel.replaceChildren(...slides);
+      watch();
+      if (clips.length) show();
+    }
+
+    /* Which clip is being watched is read off the reel rather than counted:
+       a scroll nobody asked us about is still a scroll. */
+    function watch() {
+      if (watcher) watcher.disconnect();
+      if (!slides.length) return;
+      watcher = new IntersectionObserver(entries => {
+        for (const entry of entries) {
+          const index = Number(entry.target.dataset.at);
+          if (entry.isIntersecting && index !== at) { at = index; message(''); show(); }
+        }
+      }, {root: reel, threshold: 0.6});
+      slides.forEach(slide => watcher.observe(slide));
+    }
+
+    function show() {
       const clip = clips[at];
-      const media = document.getElementById('media');
-      document.getElementById('frame').hidden = !clip;
-      document.getElementById('empty').hidden = !!clip;
-      if (!clip) {
-        media.innerHTML = '';
-        return;
-      }
+      if (!clip) return;
       document.getElementById('prevBtn').disabled = at === 0;
       document.getElementById('nextBtn').disabled = at === clips.length - 1;
       document.getElementById('title').textContent = clip.title;
       document.getElementById('meta').innerHTML =
         `${icon(clip.platform === 'tiktok' ? 'tiktok' : 'youtube')} ${esc(clip.uploader)}`
-        + ` · ${at + 1} of ${clips.length}`;
+        + ` \u00b7 ${at + 1} of ${clips.length}`;
       document.getElementById('removeSlot').innerHTML = clip.job_id
         ? deleteButton('removeClip()', {icon: true, label: 'Delete'})
         : '';
-      media.innerHTML = clip.job_id
-        ? `<video class="shorts-video" src="/api/stream/${encodeURIComponent(clip.job_id)}"
+      if (mounted !== at && mounted >= 0 && slides[mounted])
+        slides[mounted].innerHTML = poster(clips[mounted]);
+      if (clip.job_id) {
+        slides[at].innerHTML =
+          `<video class="shorts-video" src="/api/stream/${encodeURIComponent(clip.job_id)}"
              ${TAP ? '' : 'controls'} autoplay playsinline></video>`
-          + (TAP ? '<div class="shorts-progress"><span id="played"></span></div>' : '')
-        : `<div class="shorts-poster">
-             ${clip.thumbnail ? `<img src="${esc(clip.thumbnail)}" alt="">` : ''}
-             <span class="shorts-note" id="note">Fetching…</span>
-           </div>`;
-      if (clip.job_id && TAP) wireTap(media.querySelector('video'));
-      if (!clip.job_id) fetchClip(at, true);
+          + (TAP ? '<div class="shorts-progress"><span id="played"></span></div>' : '');
+        mounted = at;
+        if (TAP) wireTap(slides[at].querySelector('video'));
+      } else {
+        slides[at].innerHTML = poster(clip);
+        mounted = -1;
+        fetchClip(at, true);
+      }
       // One ahead, so the next flick does not wait on a download. Never more:
       // every extra one is a video nobody has asked to watch.
       if (clips[at + 1] && !clips[at + 1].job_id) fetchClip(at + 1, false);
@@ -155,19 +200,22 @@
         const done = await waitForFile(data.job_id);
         clip.job_id = data.job_id;
         clip.filename = done.filename;
-        if (index === at) render();
+        if (index === at) show();
       } catch (err) {
         if (index === at) message(friendlyError(err.message), true);
       }
       clip.fetching = false;
     }
 
+    /* The buttons and the keyboard scroll the reel like a finger would, so
+       every way of moving ends in the same place. */
     function step(by) {
       const next = at + by;
       if (next < 0 || next >= clips.length) return;
       at = next;
       message('');
-      render();
+      reel.scrollTo({top: next * reel.clientHeight, behavior: 'smooth'});
+      show();
     }
 
     async function removeClip() {
@@ -179,27 +227,12 @@
       render();
     }
 
-    /* Read with a thumb elsewhere, with a trackpad or a keyboard here. One
-       flick is one video: a trackpad sends a burst of small deltas, so they are
-       added up to a threshold and then ignored until the burst dies down. */
-    let wheeled = 0;
-    let wheelIdle = null;
-    document.addEventListener('wheel', e => {
-      if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
-      wheeled += e.deltaY;
-      clearTimeout(wheelIdle);
-      wheelIdle = setTimeout(() => { wheeled = 0; }, 180);
-      if (Math.abs(wheeled) < 60) return;
-      step(wheeled > 0 ? 1 : -1);
-      wheeled = 0;
-    }, {passive: true});
-
     document.addEventListener('keydown', e => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (e.key === 'ArrowDown' || e.key === 'j') { e.preventDefault(); step(1); }
       else if (e.key === 'ArrowUp' || e.key === 'k') { e.preventDefault(); step(-1); }
       else if (e.key === ' ') {
-        const video = document.querySelector('.shorts-video');
+        const video = slides[at] && slides[at].querySelector('video');
         if (!video) return;
         e.preventDefault();
         video.paused ? video.play() : video.pause();

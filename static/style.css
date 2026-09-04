@@ -1016,7 +1016,26 @@ audio.modal-media {
   /* 44 for the rail, 12 for the gap: the frame is the video plus its controls. */
   width: min(100%, calc(var(--stage) * 9 / 16 + 56px));
 }
-.shorts-media { grid-area: media; position: relative; }
+/* The reel scrolls, the browser snaps. scroll-snap-stop makes it stop on every
+   slide, so a fast flick can never skip one, and the finger, the trackpad and
+   its inertia are the system's own rather than a threshold we invented. */
+.shorts-reel {
+  grid-area: media;
+  aspect-ratio: 9 / 16;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  overscroll-behavior-y: contain;
+  border-radius: var(--radius);
+  background: var(--video-bg);
+  scrollbar-width: none;
+}
+.shorts-reel::-webkit-scrollbar { width: 0; height: 0; }
+.shorts-slide {
+  position: relative;
+  height: 100%;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
 /* Where the browser's controls would have been, and only where they are off. */
 .shorts-progress {
   position: absolute;
@@ -1036,8 +1055,7 @@ audio.modal-media {
 .shorts-poster {
   display: block;
   width: 100%;
-  aspect-ratio: 9 / 16;
-  border-radius: var(--radius);
+  height: 100%;
   background: var(--video-bg);
   object-fit: contain;
 }
