@@ -10,17 +10,24 @@
     {% include "_header.html" %}
 
     <div class="shorts" id="stage">
-      <div class="shorts-frame">
+      <div class="shorts-frame" id="frame" hidden>
         <div class="shorts-media" id="media"></div>
+        <div class="shorts-rail">
+          <button class="round-btn" id="prevBtn" onclick="step(-1)"
+                  title="Previous (up arrow)" aria-label="Previous"></button>
+          <button class="round-btn" id="nextBtn" onclick="step(1)"
+                  title="Next (down arrow)" aria-label="Next"></button>
+          <span class="round-slot" id="removeSlot"></span>
+        </div>
         <div class="shorts-caption">
           <div class="shorts-title" id="title"></div>
           <div class="shorts-meta" id="meta"></div>
         </div>
-        <div class="shorts-side">
-          <button class="icon-btn" id="prevBtn" onclick="step(-1)" title="Previous (up)" aria-label="Previous"></button>
-          <button class="icon-btn" id="nextBtn" onclick="step(1)" title="Next (down)" aria-label="Next"></button>
-          <span id="removeSlot"></span>
-        </div>
+      </div>
+      <div class="engraved" id="empty" hidden>
+        <div class="engraved-title">Nothing to watch</div>
+        <p class="engraved-note">Follow channels on the feed page, then wait for their
+          shorts to be listed. One channel comes round every few minutes.</p>
       </div>
       <p class="hint" id="message" hidden></p>
     </div>
@@ -57,17 +64,18 @@
     function render() {
       const short = shorts[at];
       const media = document.getElementById('media');
+      document.getElementById('frame').hidden = !short;
+      document.getElementById('empty').hidden = !!short;
       if (!short) {
         media.innerHTML = '';
-        document.getElementById('title').textContent = 'Nothing to watch';
-        document.getElementById('meta').textContent =
-          'Follow channels on the feed page, then wait for their shorts to be listed.';
-        document.getElementById('removeSlot').innerHTML = '';
         return;
       }
+      document.getElementById('prevBtn').disabled = at === 0;
+      document.getElementById('nextBtn').disabled = at === shorts.length - 1;
       document.getElementById('title').textContent = short.title;
-      document.getElementById('meta').textContent =
-        `${short.uploader} · ${at + 1} of ${shorts.length}`;
+      document.getElementById('meta').innerHTML =
+        `${icon(short.platform === 'tiktok' ? 'tiktok' : 'youtube')} ${esc(short.uploader)}`
+        + ` · ${at + 1} of ${shorts.length}`;
       document.getElementById('removeSlot').innerHTML = short.job_id
         ? deleteButton('removeShort()', {icon: true, label: 'Delete'})
         : '';
@@ -143,7 +151,22 @@
       render();
     }
 
-    /* A shorts feed is read with a thumb; here it is read with a keyboard. */
+    /* A shorts feed is read with a thumb; here it is read with a trackpad or a
+       keyboard. One flick is one short: a trackpad sends a burst of small
+       deltas, so they are added up to a threshold and then ignored until the
+       burst dies down. */
+    let wheeled = 0;
+    let wheelIdle = null;
+    document.addEventListener('wheel', e => {
+      if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+      wheeled += e.deltaY;
+      clearTimeout(wheelIdle);
+      wheelIdle = setTimeout(() => { wheeled = 0; }, 180);
+      if (Math.abs(wheeled) < 60) return;
+      step(wheeled > 0 ? 1 : -1);
+      wheeled = 0;
+    }, {passive: true});
+
     document.addEventListener('keydown', e => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (e.key === 'ArrowDown' || e.key === 'j') { e.preventDefault(); step(1); }

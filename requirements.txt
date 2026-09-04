@@ -1,4 +1,7 @@
 flask
 # default: the yt-dlp-ejs solver scripts, pinned by yt-dlp to the exact version
 # it expects. deno: the JavaScript engine that runs them.
-yt-dlp[default,deno]
+# curl-cffi: TikTok refuses a plain HTTP client, so yt-dlp impersonates a
+# browser's TLS fingerprint. Without it the extractor warns and breaks whenever
+# TikTok tightens.
+yt-dlp[default,deno,curl-cffi]

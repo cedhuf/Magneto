@@ -100,6 +100,8 @@
   --error-border: rgba(196, 61, 61, 0.2);
   --error-wash: rgba(196, 61, 61, 0.03);
   --error-wash-strong: rgba(196, 61, 61, 0.08);
+  /* Cut into the page: a shadow inside, a lit edge below. */
+  --engrave: inset 0 2px 5px rgba(0, 0, 0, 0.06), 0 1px 0 rgba(255, 255, 255, 0.7);
   --shimmer-base: #ebe8e2;
   --shimmer-highlight: #f0ede7;
   --noise-opacity: 0.03;
@@ -134,6 +136,7 @@
     --error-border: rgba(226, 105, 106, 0.28);
     --error-wash: rgba(226, 105, 106, 0.06);
     --error-wash-strong: rgba(226, 105, 106, 0.12);
+    --engrave: inset 0 2px 6px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.04);
     --shimmer-base: #26241e;
     --shimmer-highlight: #302d26;
     --noise-opacity: 0.02;
@@ -159,6 +162,7 @@
   --error-border: rgba(226, 105, 106, 0.28);
   --error-wash: rgba(226, 105, 106, 0.06);
   --error-wash-strong: rgba(226, 105, 106, 0.12);
+  --engrave: inset 0 2px 6px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.04);
   --shimmer-base: #26241e;
   --shimmer-highlight: #302d26;
   --noise-opacity: 0.02;
@@ -983,7 +987,7 @@ audio.modal-media {
 .shorts-frame {
   display: grid;
   grid-template-columns: minmax(0, 340px) auto;
-  grid-template-areas: "media side" "caption caption";
+  grid-template-areas: "media rail" "caption caption";
   gap: 12px;
   width: 100%;
   max-width: 420px;
@@ -1011,12 +1015,42 @@ audio.modal-media {
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.shorts-side {
-  grid-area: side;
+/* The controls sit beside the video rather than on it, as round buttons: the
+   shape says they are for moving, not for the page. */
+.shorts-rail {
+  grid-area: rail;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
   align-self: end;
+  padding-bottom: 4px;
+}
+.round-btn,
+.shorts-rail .icon-btn {
+  width: 44px;
+  height: 44px;
+  min-height: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--card-border);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--fg);
+  cursor: pointer;
+  transition: border-color 0.16s ease, color 0.16s ease, transform 0.1s ease;
+}
+.round-btn svg,
+.shorts-rail .icon-btn svg { width: 20px; height: 20px; }
+.round-btn:hover:not(:disabled),
+.shorts-rail .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+.round-btn:active:not(:disabled) { transform: scale(0.94); }
+.round-btn:disabled { opacity: 0.35; cursor: default; }
+/* Round like its neighbours, red like itself. */
+.shorts-rail .del-btn.armed,
+.shorts-rail .del-btn.armed:hover {
+  border-color: var(--error);
+  color: var(--on-error);
 }
 .shorts-caption { grid-area: caption; }
 .shorts-title {
@@ -1026,11 +1060,40 @@ audio.modal-media {
   color: var(--fg);
 }
 .shorts-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-top: 4px;
   font-size: 0.68rem;
   color: var(--muted);
   letter-spacing: 0.03em;
   text-transform: uppercase;
+}
+.shorts-meta svg { width: 14px; height: 14px; flex: 0 0 auto; }
+
+/* Cut into the page rather than laid on it: the page's own background, an inner
+   shadow for the depth and a hairline below for the lit edge. */
+.engraved {
+  max-width: 420px;
+  margin-top: 8px;
+  padding: 44px 30px;
+  border: 1.5px solid var(--card-border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  box-shadow: var(--engrave);
+  text-align: center;
+}
+.engraved-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: 1.4rem;
+  color: var(--fg);
+}
+.engraved-note {
+  margin: 8px auto 0;
+  max-width: 34ch;
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: var(--muted);
 }
 
 /* Mobile */

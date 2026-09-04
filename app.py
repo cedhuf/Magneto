@@ -56,6 +56,9 @@ SHORTS_ENABLED = FEED_ENABLED and enabled("RECLIP_SHORTS")
 # A short is downloaded when it is watched and needed only for that. An hour
 # outlives a session and nothing more.
 SHORTS_RETENTION = int(os.environ.get("RECLIP_SHORTS_RETENTION", 3600))
+# TikTok accounts are followed like channels and read on the shorts page: it is
+# the same thing, an upright video watched once.
+TIKTOK_ENABLED = SHORTS_ENABLED and enabled("RECLIP_TIKTOK")
 # A pin does not exempt a file, it moves its deadline within a limit the admin
 # still owns. Otherwise the disk stops being bounded.
 PIN_RETENTION = int(os.environ.get("RECLIP_PIN_RETENTION", 30 * 24 * 3600))
@@ -181,6 +184,9 @@ MIGRATIONS = [
     """
     ALTER TABLE entries ADD COLUMN kind TEXT NOT NULL DEFAULT 'video';
     """,
+    """
+    ALTER TABLE channels ADD COLUMN platform TEXT NOT NULL DEFAULT 'youtube';
+    """,
 ]
 
 
@@ -240,19 +246,20 @@ def require_admin():
     abort(403, f"Admin needs the {ADMIN_GROUP} group. For {current_user()}, {detail}.")
 
 
-def variant_of(format_choice, format_id, max_height):
+def variant_of(format_choice, format_id, max_height, vertical=False):
     """What was actually asked for, as one comparable string.
 
     Two accounts asking for the same URL in the same variant deserve one file,
     not two: it is the same bytes, and downloading it twice also asks YouTube
-    twice.
+    twice. The same number bounds the width of an upright video and the height
+    of a wide one, so the two cannot share a name.
     """
     if format_choice == "audio":
         return "audio"
     if format_id:
         return f"video:{format_id}"
     if max_height:
-        return f"video:h{max_height}"
+        return f"video:{'w' if vertical else 'h'}{max_height}"
     return "video:best"
 
 
@@ -447,11 +454,16 @@ def stalest_slot():
     not double how often YouTube is asked.
     """
     cutoff = time.time() - FEED_TTL
-    queue = ["SELECT c.channel_id, c.channel_url, 'videos' AS tab, c.refreshed_at AS age "
-             "FROM channels c JOIN follows f ON f.channel_id = c.channel_id"]
+    # A TikTok account has no Videos tab, so it takes one place in the queue
+    # rather than two: what it has is what the shorts page reads.
+    queue = ["SELECT c.channel_id, c.channel_url, c.platform, 'videos' AS tab, "
+             "c.refreshed_at AS age FROM channels c "
+             "JOIN follows f ON f.channel_id = c.channel_id "
+             "WHERE c.platform = 'youtube'"]
     if SHORTS_ENABLED:
-        queue.append("SELECT c.channel_id, c.channel_url, 'shorts', c.shorts_refreshed_at "
-                     "FROM channels c JOIN follows f ON f.channel_id = c.channel_id")
+        queue.append("SELECT c.channel_id, c.channel_url, c.platform, 'shorts', "
+                     "c.shorts_refreshed_at FROM channels c "
+                     "JOIN follows f ON f.channel_id = c.channel_id")
     with connect() as conn:
         # A tie goes to the tab that did not go last. Freshly imported channels
         # are all dated zero, so without this the queue does every Videos tab
@@ -477,7 +489,7 @@ def feed_poller():
                 continue
             last_tab = row["tab"]
             if row["tab"] == "shorts":
-                refresh_shorts(row["channel_url"], row["channel_id"])
+                refresh_shorts(row["channel_url"], row["channel_id"], row["platform"])
             else:
                 refresh_channel(row["channel_url"], row["channel_id"])
         except Exception as e:
@@ -496,7 +508,8 @@ def janitor():
 threading.Thread(target=janitor, daemon=True).start()
 
 
-def run_download(job_id, url, format_choice, format_id, title, max_height=None):
+def run_download(job_id, url, format_choice, format_id, title, max_height=None,
+                 vertical=False):
     out_template = os.path.join(DOWNLOAD_DIR, f"{job_id}.%(ext)s")
 
     cmd = [*YTDLP, "--no-playlist", "-o", out_template]
@@ -509,12 +522,15 @@ def run_download(job_id, url, format_choice, format_id, title, max_height=None):
         cmd += ["-f", f"{format_id}+bestaudio[ext=m4a]/bestaudio/best",
                 "--merge-output-format", "mp4"]
     elif max_height:
-        # The feed asks for a height rather than a format id: it never looked
-        # the video up, so it has no ids to choose from.
-        cmd += ["-f", f"bestvideo[height<={max_height}][vcodec^=avc1]+bestaudio[ext=m4a]/"
-                      f"bestvideo[height<={max_height}]+bestaudio[ext=m4a]/"
-                      f"bestvideo[height<={max_height}]+bestaudio/"
-                      f"best[height<={max_height}]/best",
+        # The feed asks for a size rather than a format id: it never looked the
+        # video up, so it has no ids to choose from. A short is filmed upright,
+        # where "720p" names the width: bounding its height would ask for a
+        # 405x720 copy of a 720x1280 video, or for nothing at all.
+        side = "width" if vertical else "height"
+        cmd += ["-f", f"bestvideo[{side}<={max_height}][vcodec^=avc1]+bestaudio[ext=m4a]/"
+                      f"bestvideo[{side}<={max_height}]+bestaudio[ext=m4a]/"
+                      f"bestvideo[{side}<={max_height}]+bestaudio/"
+                      f"best[{side}<={max_height}]/best",
                 "--merge-output-format", "mp4"]
     else:
         cmd += ["-f", "bestvideo+bestaudio/best", "--merge-output-format", "mp4"]
@@ -619,6 +635,60 @@ def youtube_tab_url(url, tab="videos"):
 
 def youtube_videos_url(url):
     return youtube_tab_url(url, "videos")
+
+
+def tiktok_user_url(url):
+    """Turn any TikTok URL into the account it belongs to.
+
+    A video URL is /@name/video/123, an account is /@name: pasting either one
+    means the same thing, follow this person.
+    """
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+    if not (host == "tiktok.com" or host.endswith(".tiktok.com")):
+        return None
+    parts = [part for part in parsed.path.split("/") if part]
+    if not parts or not parts[0].startswith("@") or len(parts[0]) < 2:
+        return None
+    return f"https://www.tiktok.com/{parts[0]}"
+
+
+def fetch_tiktok(url, count):
+    """List an account's latest videos, and resolve none of them.
+
+    TikTok gives more in a listing than YouTube does: a duration and a
+    timestamp come with it, so nothing has to be looked up one video at a time.
+    """
+    account_url = tiktok_user_url(url)
+    if not account_url:
+        raise ValueError("Please enter a TikTok account URL")
+    cmd = [*YTDLP, "--flat-playlist", "--playlist-end", str(count), "-J", "--", account_url]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+    if result.returncode != 0:
+        raise ValueError(result.stderr.strip().split("\n")[-1])
+    info = json.loads(result.stdout)
+    videos = []
+    for entry in info.get("entries") or []:
+        video_id = entry.get("id")
+        if not video_id:
+            continue
+        thumbnails = entry.get("thumbnails") or []
+        stamp = entry.get("timestamp")
+        videos.append({
+            "id": video_id,
+            "url": entry.get("url") or f"{account_url}/video/{video_id}",
+            "title": entry.get("title") or "Untitled",
+            "thumbnail": entry.get("thumbnail")
+            or (thumbnails[-1].get("url") if thumbnails else ""),
+            "duration": entry.get("duration"),
+            "upload_date": time.strftime("%Y%m%d", time.gmtime(stamp)) if stamp else "",
+        })
+    return {
+        "channel_id": f"tiktok:{info.get('id') or info.get('uploader') or account_url}",
+        "channel_url": account_url,
+        "title": info.get("channel") or info.get("uploader") or info.get("title") or account_url,
+        "videos": videos,
+    }
 
 
 def parse_ytdlp_lines(stdout):
@@ -747,13 +817,14 @@ def fetch_shorts(url, count):
     return shorts
 
 
-def refresh_shorts(url, channel_id):
-    """One channel's shorts, under the same lock and the same clock as a feed
-    refresh: the two tabs share one outbound budget."""
+def refresh_shorts(url, channel_id, platform="youtube"):
+    """One account's upright videos, under the same lock and the same clock as a
+    feed refresh: every source shares one outbound budget."""
     global last_channel_call
     with feed_lock:
         last_channel_call = time.time()
-        shorts = fetch_shorts(url, FEED_VIDEOS_MAX)
+        shorts = (fetch_tiktok(url, FEED_VIDEOS_MAX)["videos"] if platform == "tiktok"
+                  else fetch_shorts(url, FEED_VIDEOS_MAX))
     with connect() as conn:
         conn.execute("UPDATE channels SET shorts = ?, shorts_refreshed_at = ? "
                      "WHERE channel_id = ?",
@@ -799,7 +870,7 @@ def page_context():
     so asking for it from the browser only bought a flash of empty header."""
     return {"auth": AUTH_MODE, "user": current_user(),
             "admin": is_admin(), "logout_url": LOGOUT_URL,
-            "feed": FEED_ENABLED, "shorts": SHORTS_ENABLED}
+            "feed": FEED_ENABLED, "shorts": SHORTS_ENABLED, "tiktok": TIKTOK_ENABLED}
 
 
 @app.before_request
@@ -830,7 +901,8 @@ def feed():
     with connect() as conn:
         rows = conn.execute(
             "SELECT c.* FROM channels c JOIN follows f ON f.channel_id = c.channel_id "
-            "WHERE f.owner = ? ORDER BY c.title COLLATE NOCASE", (owner,)).fetchall()
+            "WHERE f.owner = ? AND c.platform = 'youtube' "
+            "ORDER BY c.title COLLATE NOCASE", (owner,)).fetchall()
     # What Play would reuse rather than download, in this account's quality.
     # Files are shared, so a video someone else already fetched is ready here
     # too: saying so is the difference between an instant play and a wait.
@@ -884,11 +956,11 @@ def shorts_list():
     settings = get_settings(owner)
     with connect() as conn:
         rows = conn.execute(
-            "SELECT c.title, c.shorts FROM channels c "
+            "SELECT c.title, c.shorts, c.platform FROM channels c "
             "JOIN follows f ON f.channel_id = c.channel_id "
             "WHERE f.owner = ? ORDER BY c.title COLLATE NOCASE", (owner,)).fetchall()
 
-    variant = variant_of("video", None, settings["quality"])
+    variant = variant_of("video", None, settings["quality"], vertical=True)
     with connect() as conn:
         ready = {r["url"]: r["job_id"] for r in conn.execute(
             "SELECT url, job_id, path FROM entries WHERE variant = ? AND status = 'done' "
@@ -897,7 +969,7 @@ def shorts_list():
     lists = []
     for row in rows:
         shorts = json.loads(row["shorts"])[:settings["videos"]]
-        lists.append([{**short, "uploader": row["title"],
+        lists.append([{**short, "uploader": row["title"], "platform": row["platform"],
                        "job_id": ready.get(short["url"])} for short in shorts])
 
     interleaved = []
@@ -923,17 +995,20 @@ def feed_settings():
 
 @app.route("/api/feed/subscriptions", methods=["POST"])
 def subscribe():
+    """Follow a channel, from whichever platform its URL names."""
     owner = current_user()
     url = (request.json or {}).get("url", "").strip()
-    if not is_safe_url(url) or not youtube_videos_url(url):
-        return jsonify({"error": "Please enter a YouTube channel URL"}), 400
+    tiktok = TIKTOK_ENABLED and tiktok_user_url(url)
+    if not is_safe_url(url) or not (tiktok or youtube_videos_url(url)):
+        return jsonify({"error": "Please enter a YouTube channel URL"
+                        + (" or a TikTok account" if TIKTOK_ENABLED else "")}), 400
     with connect() as conn:
         followed = conn.execute("SELECT count(*) FROM follows WHERE owner = ?",
                                 (owner,)).fetchone()[0]
     if followed >= FEED_CHANNELS_MAX:
         return jsonify({"error": f"At most {FEED_CHANNELS_MAX} channels"}), 400
     try:
-        channel = refresh_channel(url)
+        channel = follow_tiktok(url) if tiktok else refresh_channel(url)
     except subprocess.TimeoutExpired:
         return jsonify({"error": "Timed out fetching channel"}), 400
     except Exception as e:
@@ -942,6 +1017,28 @@ def subscribe():
         conn.execute("INSERT OR IGNORE INTO follows (owner, channel_id) VALUES (?, ?)",
                      (owner, channel["channel_id"]))
     return jsonify(channel)
+
+
+def follow_tiktok(url):
+    """Record a TikTok account, its videos already in the shorts column.
+
+    An upright video is an upright video: putting them where the shorts page
+    already looks is what makes one page serve both sources.
+    """
+    global last_channel_call
+    with feed_lock:
+        last_channel_call = time.time()
+        account = fetch_tiktok(url, FEED_VIDEOS_MAX)
+    with connect() as conn:
+        conn.execute(
+            "INSERT INTO channels (channel_id, channel_url, title, thumbnail, videos, "
+            "refreshed_at, shorts, shorts_refreshed_at, platform) "
+            "VALUES (?, ?, ?, '', '[]', ?, ?, ?, 'tiktok') "
+            "ON CONFLICT(channel_id) DO UPDATE SET title = excluded.title, "
+            "shorts = excluded.shorts, shorts_refreshed_at = excluded.shorts_refreshed_at",
+            (account["channel_id"], account["channel_url"], account["title"],
+             time.time(), json.dumps(account["videos"]), time.time()))
+    return account
 
 
 @app.route("/api/feed/import", methods=["POST"])
@@ -1380,7 +1477,7 @@ def start_download():
                  data.get("description", ""), format_choice, format_id, kind,
                  "downloading", time.time()))
 
-    variant = variant_of(format_choice, format_id, max_height)
+    variant = variant_of(format_choice, format_id, max_height, kind == "short")
     update_entry(job_id, variant=variant)
 
     twin = twin_of(url, variant)
@@ -1394,7 +1491,7 @@ def start_download():
 
     thread = threading.Thread(target=run_download,
                               args=(job_id, url, format_choice, format_id, title,
-                                    max_height))
+                                    max_height, kind == "short"))
     thread.daemon = True
     thread.start()
 

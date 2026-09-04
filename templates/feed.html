@@ -20,7 +20,8 @@
     </div>
     <div class="feed-panel feed-add-panel" id="addPanel" hidden>
       <form class="feed-add" id="addForm">
-        <input id="channelUrl" type="url" placeholder="Paste a YouTube channel URL…" required>
+        <input id="channelUrl" type="url" required
+          placeholder="Paste a {% if tiktok %}YouTube channel or TikTok account{% else %}YouTube channel{% endif %} URL…">
         <button class="fetch-btn" id="addSubmit">Add</button>
       </form>
       <label class="feed-import">

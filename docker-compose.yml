@@ -16,6 +16,7 @@ services:
       # The two pages that talk to YouTube on their own. Off unless asked for.
       RECLIP_FEED: "0"
       RECLIP_SHORTS: "0"
+      RECLIP_TIKTOK: "0"
     restart: unless-stopped
 
 volumes:

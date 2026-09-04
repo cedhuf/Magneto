@@ -70,6 +70,11 @@ is fetched while you watch, and both are gone after `RECLIP_SHORTS_RETENTION`.
 They stay out of the downloads list and out of the history ceiling, and `/admin`
 shows them as one line with a purge of their own.
 
+With `RECLIP_TIKTOK`, the same page also plays TikTok accounts: paste one on the
+feed page like any channel. TikTok lists more than YouTube does, a duration and
+a date included, so an account is one listing and never a per-video lookup, and
+it takes one place in the queue rather than two since it has no long videos.
+
 The shorts tab of a channel is a second listing, so a channel takes two places
 in the refresh queue instead of one. The outbound rate is unchanged, one lookup
 per `RECLIP_FEED_POLL` whatever is enabled; what changes is that each tab comes
@@ -159,6 +164,7 @@ date rather than stored.
 | `RECLIP_PLAYLIST_MAX` | `50` | Most videos one pasted playlist may expand to |
 | `RECLIP_FEED` | `0` | The feed page, and with it the only thread that asks YouTube anything on its own. Off unless asked for |
 | `RECLIP_SHORTS` | `0` | The shorts page. Shorts come from the channels followed on the feed, so this does nothing while `RECLIP_FEED` is off |
+| `RECLIP_TIKTOK` | `0` | Follow TikTok accounts too. Their videos are read on the shorts page, so this does nothing while `RECLIP_SHORTS` is off |
 | `RECLIP_SHORTS_RETENTION` | `3600` | Seconds a watched short is kept. It is fetched to be watched once, so it does not need the deadline a download gets, and it is never pinned |
 | `RECLIP_FEED_VIDEOS` | `5` | Ceiling for the per-user feed setting, not the setting itself |
 | `RECLIP_FEED_POLL` | `300` | Seconds between two channel lookups, for the whole instance |
@@ -216,7 +222,8 @@ YouTube, TikTok, Instagram, Twitter/X, Reddit, Facebook, Vimeo, Twitch, Dailymot
   the SIL Open Font License. No page load reaches a third party
 - **Icons:** [Tabler Icons](https://tabler.io/icons) 3.46.0 (MIT), vendored in
   `static/icons.js`. Only the handful used is carried, so nothing is fetched
-- **Download engine:** [yt-dlp](https://github.com/yt-dlp/yt-dlp) + [ffmpeg](https://ffmpeg.org/)
+- **Download engine:** [yt-dlp](https://github.com/yt-dlp/yt-dlp) + [ffmpeg](https://ffmpeg.org/),
+  with `curl-cffi` for the browser impersonation TikTok requires
 - **JavaScript runtime:** [deno](https://deno.com/) and the solver scripts, both
   from `yt-dlp[default,deno]`. YouTube's player challenge needs a real JS engine;
   without one yt-dlp falls back to clients YouTube may refuse, and formats go
