@@ -315,6 +315,29 @@ textarea::placeholder { color: var(--muted); }
 
 /* Cards */
 .cards { margin-top: 24px; }
+/* Rows by default. The grid modifier reuses the stacked shape the small-screen
+   rules already define, rather than describing a second card. */
+.cards.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+.cards.grid .card { flex-direction: column; min-height: 0; margin-bottom: 0; }
+.cards.grid .card-thumb {
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 16 / 9;
+  align-self: auto;
+}
+.cards.grid .card-body { padding: 12px 14px 0; }
+.cards.grid .card-title { white-space: normal; }
+.cards.grid .card-side {
+  flex-direction: row;
+  width: 100%;
+  justify-content: space-between;
+  padding: 12px 14px 14px;
+}
 
 /* Admin */
 .brand-actions {
@@ -333,6 +356,7 @@ textarea::placeholder { color: var(--muted); }
   text-transform: uppercase;
   white-space: nowrap;
 }
+.thumb-badge.start { right: auto; left: 5px; }
 .text-btn:hover { color: var(--accent); }
 /* The page you are on is marked, not removed. */
 .text-btn.active { color: var(--fg); cursor: default; }
@@ -424,17 +448,6 @@ textarea::placeholder { color: var(--muted); }
 .feed-add input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 .feed-add .fetch-btn { flex: 0 0 auto; }
 .feed-head { display: flex; justify-content: space-between; align-items: center; margin: 32px 0 12px; font-size: 0.68rem; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
-.feed-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.feed-video { display: block; width: 100%; overflow: hidden; border: 1.5px solid var(--card-border); border-radius: var(--radius); background: var(--card); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .16s, transform .16s; }
-.feed-video:hover { border-color: var(--muted); transform: translateY(-2px); }
-.feed-thumb { position: relative; aspect-ratio: 16 / 9; background: var(--card-border); }
-.feed-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.feed-thumb span { position: absolute; padding: 2px 5px; border-radius: 4px; background: var(--scrim-strong); color: var(--on-scrim); font-size: .58rem; letter-spacing: .04em; text-transform: uppercase; }
-.feed-date { top: 6px; left: 6px; }
-.feed-duration { right: 6px; bottom: 6px; }
-.feed-video-body { padding: 10px 12px 12px; }
-.feed-video-title { font-family: 'Instrument Serif', serif; font-size: 1rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.feed-video-meta { margin-top: 5px; color: var(--muted); font-size: .62rem; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .subscriptions { margin-top: 40px; }
 .channel-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; }
 .channel-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 10px 2px; border-bottom: 1px solid var(--card-border); font-size: .74rem; }
@@ -714,8 +727,9 @@ audio.modal-media {
 .card-note { font-size: 0.68rem; color: var(--muted); }
 .card-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
 
-/* Remaining time sits on the thumbnail, out of the text flow entirely. */
-.thumb-ttl {
+/* Badges sit on the thumbnail, out of the text flow entirely, so nothing they
+   say can push the layout around. */
+.thumb-badge {
   position: absolute;
   right: 5px;
   bottom: 5px;
@@ -897,7 +911,7 @@ audio.modal-media {
 
 /* Mobile */
 @media (max-width: 720px) {
-  .feed-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cards.grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .card-thumb { width: 132px; min-width: 132px; }
   .card-body { padding: 12px; }
 }
@@ -935,7 +949,7 @@ audio.modal-media {
   .feed-add { flex-wrap: wrap; }
   .feed-add input { width: 100%; flex-basis: 100%; }
   .feed-add .fetch-btn { width: 100%; }
-  .feed-grid { grid-template-columns: 1fr; }
+  .cards.grid { grid-template-columns: 1fr; }
   .channel-list { grid-template-columns: 1fr; }
   .modal { padding: 12px; }
 }
@@ -991,3 +1005,16 @@ audio.modal-media {
   color: var(--error);
   font-weight: 500;
 }
+
+/* A title that opens something is a button, and must not look like one. */
+.card-title.as-text {
+  border: none;
+  background: none;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.card-title.as-text:hover { color: var(--accent); }

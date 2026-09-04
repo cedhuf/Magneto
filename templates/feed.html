@@ -18,6 +18,7 @@
     <div class="feed-head" id="feedHead" hidden>
       <span id="videoCount"></span>
       <span class="feed-head-actions">
+        <button class="link-btn" id="layoutBtn">Grid</button>
         <button class="link-btn" id="settingsBtn">Settings</button>
         <button class="link-btn" id="refreshBtn">Refresh feed</button>
       </span>
@@ -30,7 +31,7 @@
         <span class="pill-group" id="countPills"></span>
       </label>
     </div>
-    <div class="feed-grid" id="videos"></div>
+    <div class="cards grid" id="videos"></div>
     <div class="subscriptions" id="subscriptions" hidden>
       <div class="history-head">Channels</div>
       <div class="channel-list" id="channelList"></div>
@@ -39,6 +40,7 @@
 
   <script src="/static/format.js"></script>
   <script src="/static/modal.js"></script>
+  <script src="/static/card.js"></script>
   <script>
     let feedVideos = [];
     let feedChannels = [];
@@ -56,11 +58,17 @@
       feedLimits = data.limits;
       renderSettings();
       const videos = document.getElementById('videos');
-      videos.innerHTML = data.videos.map((v, i) => `<button class="feed-video" type="button" onclick="openVideo(${i})">
-        <div class="feed-thumb">${v.thumbnail ? `<img src="${esc(v.thumbnail)}" alt="">` : ''}${fmtDate(v.upload_date) ? `<span class="feed-date">${fmtDate(v.upload_date)}</span>` : ''}${v.duration ? `<span class="feed-duration">${fmtDur(v.duration)}</span>` : ''}</div>
-        <div class="feed-video-body"><div class="feed-video-title">${esc(v.title)}</div>
-        <div class="feed-video-meta">${esc(v.channel)}${fmtDate(v.upload_date) ? ` · ${fmtDate(v.upload_date)}` : ''}</div></div>
-      </button>`).join('');
+      videos.innerHTML = data.videos.map((v, i) => mediaCardMarkup({
+        thumbnail: v.thumbnail,
+        alt: v.title,
+        badges: [{text: fmtDur(v.duration), place: 'end'},
+                 {text: fmtDate(v.upload_date), place: 'start'}],
+        play: `playVideo(${i})`,
+        title: v.title,
+        onTitle: `openVideo(${i})`,
+        meta: esc(v.channel),
+        actions: `<button class="card-dl-btn" onclick="saveVideo(${i})">Download</button>`,
+      })).join('');
       document.getElementById('feedHead').hidden = !data.channels.length;
       document.getElementById('videoCount').textContent = `${data.videos.length} latest video${data.videos.length === 1 ? '' : 's'}`;
       const list = document.getElementById('channelList');
@@ -240,6 +248,7 @@
       if (!confirm('Remove this channel from your feed?')) return;
       await fetch(`/api/feed/subscriptions/${encodeURIComponent(id)}`, {method: 'DELETE'}); load();
     }
+    initLayoutToggle(['videos'], 'layout.feed', 'grid');
     load();
   </script>
   <script src="/static/theme.js"></script>

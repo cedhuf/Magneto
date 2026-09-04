@@ -20,6 +20,10 @@
       <button class="fetch-btn" id="goBtn" onclick="go()">Fetch</button>
     </div>
 
+    <div class="feed-head">
+      <span></span>
+      <button class="link-btn" id="layoutBtn">Grid</button>
+    </div>
     <div id="cards" class="cards"></div>
 
     <div id="history-section" class="history" hidden>
@@ -39,6 +43,7 @@
 
   <script src="/static/format.js"></script>
   <script src="/static/modal.js"></script>
+  <script src="/static/card.js"></script>
   <script>
     let currentFormat = 'video';
     let cardData = [];
@@ -313,39 +318,20 @@
         note = '<span class="card-note">no longer on server</span>';
       }
 
-      const playHtml = (c.status === 'ready' || c.status === 'done')
-        ? `<button class="thumb-play" onclick="playCard(${idx})" aria-label="Play" title="Play">
-             <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 21 12 6 21 6 3"/></svg>
-           </button>`
-        : '';
+      const badges = [];
+      if (c.status === 'done') badges.push({text: ttlLabel(c), id: `ttl-${idx}`});
 
-      const meta = [c.uploader, c.duration ? fmtDur(c.duration) : '',
-                    fmtDate(c.upload_date)].filter(Boolean).map(esc);
-      // Links and sponsor blocks make modern descriptions unreadable inline, so
-      // it stays folded and is shown as plain text, never as live links.
-      const descToggle = c.description
-        ? `<button class="link-btn" onclick="toggleDesc(${idx})">Description</button>`
-        : '';
-
-      // On the thumbnail, so a long countdown cannot move any text.
-      const ttlHtml = c.status === 'done'
-        ? `<span class="thumb-ttl" id="ttl-${idx}">${ttlLabel(c)}</span>`
-        : '';
-
-      el.innerHTML = `
-        <div class="card-thumb">${thumbHtml}${playHtml}${ttlHtml}</div>
-        <div class="card-body">
-          <div class="card-title">${esc(c.title || 'Untitled')}</div>
-          <div class="card-meta">${meta.join(' · ')}${descToggle}</div>
-          ${c.description ? `<div class="card-desc" id="desc-${idx}" hidden>${esc(c.description)}</div>` : ''}
-          ${note ? `<div class="card-note-row">${note}</div>` : ''}
-          ${qualityChips ? `<div class="card-chips">${qualityChips}</div>` : ''}
-        </div>
-        <div class="card-side">
-          ${entryActions(idx, c)}
-          ${primary}
-        </div>
-      `;
+      el.outerHTML = mediaCardMarkup({
+        id: `card-${idx}`,
+        thumbnail: isAudio ? '' : c.thumbnail,
+        badges,
+        play: ['ready', 'done'].includes(c.status) ? `playCard(${idx})` : '',
+        title: c.title || 'Untitled',
+        meta: meta.join(' \u00b7 ') + descToggle,
+        note: [note, c.description ? `<div class="card-desc" id="desc-${idx}" hidden>${esc(c.description)}</div>` : ''].join(''),
+        chips: qualityChips,
+        actions: entryActions(idx, c) + primary,
+      });
     }
 
     function showAllSites() {
@@ -591,6 +577,7 @@
     }
 
 
+    initLayoutToggle(['cards', 'history'], 'layout.home', 'rows');
     restoreEntries();
     // Feed links arrive here ready to use the normal format and quality picker.
     const feedUrl = new URLSearchParams(location.search).get('url');
