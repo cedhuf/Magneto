@@ -416,8 +416,6 @@ textarea::placeholder { color: var(--muted); }
   text-transform: uppercase;
 }
 .stat-hint { margin-top: 2px; font-size: 0.64rem; color: var(--muted); opacity: 0.7; }
-.admin-controls { margin-top: 20px; }
-.admin-controls .fetch-btn { flex: 0 0 auto; }
 
 /* Wide tables scroll on their own rather than pushing the page sideways. */
 .table-scroll { overflow-x: auto; }
@@ -494,6 +492,18 @@ textarea::placeholder { color: var(--muted); }
   border-bottom: 1px solid var(--card-border);
 }
 .history .cards { margin-top: 14px; }
+/* A list header that also carries its actions, as on the feed. */
+.history-head.with-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.history-head + .hint { margin-top: 10px; }
+/* A destructive link says it in its colour and its word, not by turning into a
+   red chip: there is no button shape here to fill. */
+.link-btn.del-btn.armed,
+.link-btn.del-btn.armed:hover { background: none; color: var(--error); }
 
 /* One row height for every card, so the thumbnails keep the same shape all the
    way down the list. min-height rather than height: an error message is allowed

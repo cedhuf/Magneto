@@ -11,17 +11,18 @@
 
     <div class="stats" id="stats"></div>
 
-    <div class="controls admin-controls">
-      <!-- Sized for its longest label, so arming it does not move the page.
-           Everything is set in one monospace face, so that is a character count. -->
-      <button class="fetch-btn danger del-btn" id="purgeBtn" data-confirm="Confirm"
-        style="min-width: calc(17ch + 0.68em)"
-        onclick="if (armDelete(this)) { purgeAll() }">Delete everything</button>
-      <span class="card-status" id="purgeMsg"></span>
-    </div>
-
     <div class="history">
-      <div class="history-head">Everything on this instance</div>
+      <div class="history-head with-actions">
+        <span>Everything on this instance</span>
+        <span class="feed-head-actions">
+          <!-- Sized for its longest label, so arming it does not move the row.
+               Everything is set in one monospace face: that is a character count. -->
+          <button class="link-btn del-btn" id="purgeBtn" data-confirm="Confirm"
+            style="min-width: calc(17ch + 0.68em)"
+            onclick="if (armDelete(this)) { purgeAll() }">Delete everything</button>
+        </span>
+      </div>
+      <p class="hint" id="purgeMsg" hidden></p>
       <div class="table-scroll">
         <table class="admin-table" id="table"></table>
       </div>
@@ -113,6 +114,7 @@
         ? `${d.entries} entries and ${d.files} files gone, ${fmtSize(d.bytes) || '0 MB'} freed`
           + (d.running ? `, ${d.running} still downloading` : '')
         : 'Could not delete.';
+      msg.hidden = false;
     }
 
     async function clearShorts() {
