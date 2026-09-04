@@ -68,8 +68,12 @@ Nothing is embedded from YouTube.
 **Shorts** shows the shorts of the same channels, one at a time, in the shape
 they were filmed in, each looping until you move on. Down and up, or `j` and
 `k`, move between them, space pauses. Safari refuses to start a video that has
-sound until the page has been touched, so a clip it refuses plays muted with the
+sound until someone has touched it, so a clip it refuses plays muted with the
 sound one tap away, rather than sitting there waiting to be started by hand.
+That unlock is per element and not per page, so the reel holds one `<video>` and
+moves it from clip to clip: build a fresh one each time and the tap is asked for
+again on every single clip. A wake lock is held while it plays, since a muted
+inline video does not keep a phone awake on its own.
 The button above the arrows, or `f`, gives the video the whole window. It is a
 class on the page rather than the browser's fullscreen API alone: iOS has no
 element fullscreen, and going through the video's own would leave the reel and

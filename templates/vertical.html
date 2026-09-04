@@ -56,7 +56,6 @@
        already the act that downloads it. Show watched asks for the lot. */
     let watched = false;
     let reading = -1;
-    let current = null;
     let hidden = 0;
     /* A touch screen has no hover, so the browser shows its own controls on
        every new clip and leaves them there for seconds. On a clip that lasts
@@ -145,7 +144,6 @@
       const clip = clips[at];
       if (!clip) return;
       if (reading >= 0 && reading !== at && clips[reading]) markSeen(clips[reading].url);
-      if (reading !== at) { current = null; document.getElementById('sound').hidden = true; }
       reading = at;
       document.getElementById('prevBtn').disabled = at === 0;
       document.getElementById('nextBtn').disabled = at === clips.length - 1;
@@ -159,20 +157,20 @@
              title="${clip.shared ? 'Copy the link again' : 'Share'}"
              aria-label="Share">${icon(clip.shared ? 'link' : 'share')}</button>`
         : '';
-      if (mounted !== at && mounted >= 0 && slides[mounted])
-        slides[mounted].innerHTML = poster(clips[mounted]);
+      const previous = mounted;
       if (clip.job_id) {
-        slides[at].innerHTML =
-          `<video class="shorts-video" src="/api/stream/${encodeURIComponent(clip.job_id)}"
-             ${TAP ? '' : 'controls'} autoplay loop playsinline></video>`
-          + (TAP ? '<div class="shorts-progress"><span id="played"></span></div>' : '');
+        // Moved into the slide rather than built there: see the note on player.
+        slides[at].innerHTML = '';
+        slides[at].appendChild(player);
         mounted = at;
-        play(slides[at].querySelector('video'));
+        show_clip(clip);
       } else {
-        slides[at].innerHTML = poster(clip);
         mounted = -1;
         fetchClip(at, true);
       }
+      if (previous !== at && previous >= 0 && slides[previous])
+        slides[previous].innerHTML = poster(clips[previous]);
+      if (mounted !== at) slides[at].innerHTML = poster(clip);
       // One ahead, so the next flick does not wait on a download. Never more:
       // every extra one is a video nobody has asked to watch.
       if (clips[at + 1] && !clips[at + 1].job_id) fetchClip(at + 1, false);
@@ -209,40 +207,76 @@
       await load();
     });
 
-    /* Safari will not start a video that has sound until the page has been
-       touched, and says so with a rejected promise rather than an error: the
-       clip simply sits there. Muting is the only way to keep the reel moving,
-       and the tap that gives the sound back also unlocks it for the session,
-       so it happens once. */
-    function play(video) {
-      if (!video) return;
-      current = video;
-      video.play().catch(() => {
-        video.muted = true;
-        document.getElementById('sound').hidden = false;
-        video.play().catch(() => {});
-      });
-      if (TAP) wireTap(video);
-    }
+    /* One video element for the whole reel, moved from slide to slide.
 
-    function unmute() {
-      if (!current) return;
-      current.muted = false;
-      current.play().catch(() => {});
-      document.getElementById('sound').hidden = true;
-    }
-
-    function wireTap(video) {
+       Safari unlocks sound per element, not per page: a fresh <video> built for
+       each clip starts locked again every time, and a scroll is not a gesture
+       that unlocks anything. So the tap that gives the sound back has to land
+       on an element that survives the next clip, which is this one. */
+    const player = document.createElement('div');
+    player.className = 'shorts-player';
+    const video = document.createElement('video');
+    video.className = 'shorts-video';
+    video.loop = true;
+    video.playsInline = true;
+    if (!TAP) video.controls = true;
+    player.appendChild(video);
+    if (TAP) {
+      const bar = document.createElement('div');
+      bar.className = 'shorts-progress';
+      bar.innerHTML = '<span id="played"></span>';
+      player.appendChild(bar);
       // The first tap is worth sound, not a pause: that is what it is asking for.
       video.addEventListener('click', () => {
         if (video.muted) return unmute();
         video.paused ? video.play() : video.pause();
       });
       video.addEventListener('timeupdate', () => {
-        const bar = document.getElementById('played');
-        if (bar && video.duration) bar.style.width = `${video.currentTime / video.duration * 100}%`;
+        const played = document.getElementById('played');
+        if (played && video.duration) {
+          played.style.width = `${video.currentTime / video.duration * 100}%`;
+        }
       });
     }
+    video.addEventListener('play', () => keepAwake(true));
+    video.addEventListener('pause', () => keepAwake(false));
+
+    function show_clip(clip) {
+      const src = `/api/stream/${encodeURIComponent(clip.job_id)}`;
+      if (video.getAttribute('src') !== src) video.setAttribute('src', src);
+      const offer = document.getElementById('sound');
+      video.play().then(() => { offer.hidden = true; }).catch(() => {
+        video.muted = true;
+        offer.hidden = false;
+        video.play().catch(() => {});
+      });
+    }
+
+    function unmute() {
+      video.muted = false;
+      video.play().catch(() => {});
+      document.getElementById('sound').hidden = true;
+    }
+
+    /* A muted inline video does not hold the screen awake, and neither does a
+       long one on a phone left alone. The lock is dropped as soon as the video
+       is, and taken again when the tab comes back. */
+    let awake = null;
+    async function keepAwake(on) {
+      try {
+        if (on && !awake && navigator.wakeLock) {
+          awake = await navigator.wakeLock.request('screen');
+          awake.addEventListener('release', () => { awake = null; });
+        } else if (!on && awake) {
+          await awake.release();
+          awake = null;
+        }
+      } catch (e) {}
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && !video.paused) keepAwake(true);
+    });
 
     async function fetchClip(index, showing) {
       const clip = clips[index];
