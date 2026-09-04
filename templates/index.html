@@ -33,7 +33,7 @@
     </div>
 
     <textarea id="urls" placeholder="Paste one or more URLs..." rows="2"></textarea>
-    <p class="hint">Multiple links? Separate with spaces, commas, or newlines.</p>
+    <p class="hint" id="hint">Multiple links? Separate with spaces, commas, or newlines.</p>
 
     <div class="controls">
       <div class="pill-group">
@@ -68,6 +68,21 @@
       document.querySelectorAll('.pill').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentFormat = btn.dataset.format;
+    }
+
+    const HINT = document.getElementById('hint').textContent;
+
+    /* Only a URL that names no video. YouTube appends &list= to a plain watch
+       link whenever it is copied from inside a playlist, from a channel's
+       uploads or from Watch later, and treating that as a playlist turned one
+       pasted video into hundreds of lookups. */
+    function isPlaylistUrl(raw) {
+      try {
+        const u = new URL(raw);
+        return !u.searchParams.get('v') && u.searchParams.has('list');
+      } catch (e) {
+        return false;
+      }
     }
 
     function parseUrls(text) {
@@ -139,7 +154,7 @@
     });
 
     async function go() {
-      const urls = parseUrls(document.getElementById('urls').value);
+      let urls = parseUrls(document.getElementById('urls').value);
       if (!urls.length) return;
 
       const btn = document.getElementById('goBtn');
@@ -166,21 +181,36 @@
         }
       });
 
-      // Check if youtube playlist URL
-      for (let i = 0; i < urls.length; i++) {
-        if (urls[i].includes('list=')) {
+      // Expand real playlists, over a copy. The previous version spliced into
+      // the array it was iterating, so an expanded URL could be expanded again.
+      const expanded = [];
+      let capped = 0;
+      for (const url of urls) {
+        if (!isPlaylistUrl(url)) {
+          expanded.push(url);
+          continue;
+        }
+        try {
           const res = await fetch('/api/playlist', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: urls[i] }),
+            body: JSON.stringify({ url }),
           });
           const data = await res.json();
-          if (data.urls) {
-            // replace playlist URL with individual video URLs
-            urls.splice(i, 1, ...data.urls);
+          if (data.urls && data.urls.length) {
+            expanded.push(...data.urls);
+            if (data.truncated) capped = data.limit;
+          } else {
+            expanded.push(url);
           }
+        } catch (err) {
+          expanded.push(url);
         }
       }
+      urls = expanded;
+      document.getElementById('hint').textContent = capped
+        ? `Playlist capped at ${capped} videos.`
+        : HINT;
 
       for (let i = 0; i < urls.length; i++) {
         const url = urls[i];

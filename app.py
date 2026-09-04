@@ -22,6 +22,9 @@ RETENTION = int(os.environ.get("RECLIP_RETENTION", 24 * 3600))
 # the upstream default allowed. The download runs in its own thread, so this
 # does not tie up a gunicorn worker.
 DOWNLOAD_TIMEOUT = int(os.environ.get("RECLIP_DOWNLOAD_TIMEOUT", 20 * 60))
+# A playlist expansion costs one yt-dlp process per entry afterwards, so an
+# uncapped one is a way to bring the server down by pasting a link.
+PLAYLIST_MAX = int(os.environ.get("RECLIP_PLAYLIST_MAX", 50))
 # A pin does not exempt a file, it moves its deadline within a limit the admin
 # still owns. Otherwise the disk stops being bounded.
 PIN_RETENTION = int(os.environ.get("RECLIP_PIN_RETENTION", 30 * 24 * 3600))
@@ -705,7 +708,8 @@ def get_playlist_info():
     if not is_safe_url(url):
         return jsonify({"error": "Invalid URL"}), 400
 
-    cmd = ["yt-dlp", "--flat-playlist", "-J", "--", url]
+    cmd = ["yt-dlp", "--flat-playlist", "--playlist-end", str(PLAYLIST_MAX + 1),
+           "-J", "--", url]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         if result.returncode != 0:
@@ -714,7 +718,9 @@ def get_playlist_info():
         info = json.loads(result.stdout)
         entries = info.get("entries", [])
         urls = [entry.get("url") for entry in entries if entry.get("url")]
-        return jsonify({"urls": urls})
+        return jsonify({"urls": urls[:PLAYLIST_MAX],
+                        "truncated": len(urls) > PLAYLIST_MAX,
+                        "limit": PLAYLIST_MAX})
     except subprocess.TimeoutExpired:
         return jsonify({"error": "Timed out fetching playlist info"}), 400
     except Exception as e:
