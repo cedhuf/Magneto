@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import uuid
 import glob
@@ -961,12 +962,21 @@ def get_info():
         def rank(f):
             return (f.get("vcodec", "").startswith("avc1"), f.get("tbr") or 0)
 
+        # YouTube names a rung after its 16:9 equivalent, so 1920x960 on a 2:1
+        # video is "1080p" and not "960p". It puts that name on one format of
+        # the rung and leaves the others without, so the name is read from the
+        # whole rung rather than from the format we happen to prefer.
+        rung_names = {}
         best_by_height = {}
         for f in info.get("formats", []):
             height = f.get("height")
-            if height and f.get("vcodec", "none") != "none":
-                if height not in best_by_height or rank(f) > rank(best_by_height[height]):
-                    best_by_height[height] = f
+            if not height or f.get("vcodec", "none") == "none":
+                continue
+            named = re.match(r"(\d+p\d*)", f.get("format_note") or "")
+            if named:
+                rung_names.setdefault(height, named.group(1))
+            if height not in best_by_height or rank(f) > rank(best_by_height[height]):
+                best_by_height[height] = f
 
         duration = info.get("duration") or 0
 
@@ -984,7 +994,7 @@ def get_info():
         for height, f in best_by_height.items():
             formats.append({
                 "id": f["format_id"],
-                "label": f"{height}p",
+                "label": rung_names.get(height, f"{height}p"),
                 "height": height,
                 # Video stream only, and often an estimate. It is an order of
                 # magnitude, not an accounting figure.
