@@ -1,5 +1,7 @@
-{# Rendered server-side. The identity is known here, so asking the browser to
-   fetch it afterwards only bought a flash of empty header on every page. #}
+{# The same items in the same order on every page. Rendered server-side: the
+   identity is known here, and fetching it afterwards only bought a flash of
+   empty header. The current page is marked rather than removed, so the header
+   never changes shape as you move between pages. #}
 <div class="brand">
   <div class="brand-text">
     <h1><a class="brand-link" href="/">Re<em>Clip</em></a></h1>
@@ -8,14 +10,14 @@
   <div class="brand-actions">
     {% if auth == 'proxy' %}
       {% if admin %}
-        <a class="text-btn" href="/admin">{{ user }}</a>
+        <a class="text-btn{{ ' active' if page == 'admin' }}" href="/admin">{{ user }}</a>
       {% else %}
         <span class="text-btn">{{ user }}</span>
       {% endif %}
     {% elif admin %}
-      <a class="text-btn" href="/admin">Admin</a>
+      <a class="text-btn{{ ' active' if page == 'admin' }}" href="/admin">Admin</a>
     {% endif %}
-    {% if page != 'feed' %}<a class="text-btn" href="/feed">Feed</a>{% endif %}
+    <a class="text-btn{{ ' active' if page == 'feed' }}" href="/feed">Feed</a>
     {% if auth == 'proxy' and logout_url %}
       <a class="text-btn" href="{{ logout_url }}">Sign out</a>
     {% endif %}

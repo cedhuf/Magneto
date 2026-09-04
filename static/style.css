@@ -188,14 +188,17 @@ body::after {
   padding: 60px 24px 80px;
 }
 
+/* The actions never drop below the title. When the row runs out of room it is
+   the action block that wraps onto itself, staying in the top right corner. */
 .brand {
   margin-bottom: 48px;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
 }
+.brand-text { min-width: 0; }
 /* The theme is a setting, not a destination: a rule and a wider gap say so
    without adding a second visual style. */
 .theme-btn {
@@ -219,7 +222,7 @@ body::after {
 :root[data-theme="dark"] .theme-btn::after { content: 'Dark'; }
 .brand h1 {
   font-family: 'Instrument Serif', serif;
-  font-size: clamp(2.6rem, 8vw, 4.2rem);
+  font-size: clamp(2.2rem, 8vw, 4.2rem);
   font-weight: 400;
   letter-spacing: -0.03em;
   line-height: 1;
@@ -314,7 +317,14 @@ textarea::placeholder { color: var(--muted); }
 .cards { margin-top: 24px; }
 
 /* Admin */
-.brand-actions { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+.brand-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
 .text-btn {
   font-size: 0.72rem;
   color: var(--muted);
@@ -324,6 +334,8 @@ textarea::placeholder { color: var(--muted); }
   white-space: nowrap;
 }
 .text-btn:hover { color: var(--accent); }
+/* The page you are on is marked, not removed. */
+.text-btn.active { color: var(--fg); cursor: default; }
 
 .stats {
   display: grid;
