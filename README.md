@@ -98,8 +98,13 @@ accounts, and only the handles are sent. As with the YouTube import, nothing is
 looked up: every account is followed at once and the poller fills them one at a
 time.
 
+Each platform has its own queue, its own clock and its own ceiling. YouTube
+cannot see what TikTok was asked, so making them share one budget had each
+paying for the other's curiosity while protecting neither. A third platform
+would get its own the same way.
+
 The shorts tab of a channel is a second listing, so a channel takes two places
-in the refresh queue instead of one. The outbound rate is unchanged, one lookup
+in its platform's refresh queue instead of one. The outbound rate is unchanged, one lookup
 per `RECLIP_FEED_POLL` whatever is enabled; what changes is that each tab comes
 round half as often. Unlike the feed, shorts are never resolved one by one: the
 tab is already newest first, so the page keeps that order rather than asking
@@ -263,10 +268,10 @@ date rather than stored.
 | `RECLIP_SHORTS_RETENTION` | `86400` | Seconds a fetched short or TikTok clip is kept. A watched clip leaves the reel, so what this holds is one person's day of watching rather than everything their accounts list. Never pinned, and out of the history ceiling |
 | `RECLIP_SEEN_RETENTION` | `604800` | Seconds a "watched" row is kept. Past the point where the clip has left every listing, the row can no longer hide anything |
 | `RECLIP_FEED_VIDEOS` | `5` | Ceiling for the per-user feed setting, not the setting itself |
-| `RECLIP_FEED_POLL` | `300` | Seconds between two channel lookups, for the whole instance |
+| `RECLIP_FEED_POLL` | `300` | Seconds between two lookups of one platform. Each platform keeps its own clock, its own lock and its own queue: spacing exists to avoid being refused by a provider, and a provider only sees its own traffic |
 | `RECLIP_FEED_TTL` | `21600` | Age at which a cached channel is worth looking up again |
 | `RECLIP_FEED_COOLDOWN` | `600` | Minimum age before a manual refresh does anything |
-| `RECLIP_FEED_CHANNELS_MAX` | `30` | Channels one account may follow |
+| `RECLIP_FEED_CHANNELS_MAX` | `30` | Channels one account may follow, **per platform**: following TikTok accounts does not cost YouTube channels |
 | `RECLIP_PIN_RETENTION` | `2592000` | Seconds a pinned file is kept. A pin moves the deadline, it does not lift it, so the disk stays bounded |
 | `RECLIP_HISTORY_MAX` | `200` | Entries kept per user. Older ones are dropped, pinned ones never |
 | `RECLIP_DB` | `data/reclip.db` | SQLite file. Put it on the same volume as the downloads, not inside the downloads directory |

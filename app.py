@@ -513,30 +513,28 @@ def trim_history():
             conn.execute("DELETE FROM entries WHERE job_id = ?", (row["job_id"],))
 
 
-def stalest_slot():
-    """The oldest tab somebody still follows, videos and shorts in one queue.
+def stalest_slot(platform):
+    """The oldest tab of one platform that somebody still follows.
 
-    A channel holds two slots when shorts are on. Putting them in the same queue
-    is what keeps the outbound rate at one lookup per FEED_POLL whatever is
-    enabled: turning shorts on halves how often each tab comes round, it does
-    not double how often YouTube is asked.
+    A YouTube channel holds two slots, its Videos tab and its Shorts tab; a
+    TikTok account holds one, since it has no long videos. Turning shorts on
+    therefore halves how often each YouTube tab comes round, it does not double
+    how often YouTube is asked.
     """
     cutoff = time.time() - FEED_TTL
-    # One queue, whatever is enabled. A YouTube channel holds two places, its
-    # Videos tab and its Shorts tab; a TikTok account holds one, since it has no
-    # long videos. A page that is off puts nothing in the queue at all.
     queue = []
-    if FEED_ENABLED:
-        queue.append("SELECT c.channel_id, c.channel_url, c.platform, 'videos' AS tab, "
-                     "c.refreshed_at AS age FROM channels c "
-                     "JOIN follows f ON f.channel_id = c.channel_id "
-                     "WHERE c.platform = 'youtube' AND c.has_videos = 1")
-    if SHORTS_ENABLED:
-        queue.append("SELECT c.channel_id, c.channel_url, c.platform, 'shorts' AS tab, "
-                     "c.shorts_refreshed_at AS age FROM channels c "
-                     "JOIN follows f ON f.channel_id = c.channel_id "
-                     "WHERE c.platform = 'youtube' AND c.has_shorts = 1")
-    if TIKTOK_ENABLED:
+    if platform == "youtube":
+        if FEED_ENABLED:
+            queue.append("SELECT c.channel_id, c.channel_url, c.platform, 'videos' AS tab, "
+                         "c.refreshed_at AS age FROM channels c "
+                         "JOIN follows f ON f.channel_id = c.channel_id "
+                         "WHERE c.platform = 'youtube' AND c.has_videos = 1")
+        if SHORTS_ENABLED:
+            queue.append("SELECT c.channel_id, c.channel_url, c.platform, 'shorts' AS tab, "
+                         "c.shorts_refreshed_at AS age FROM channels c "
+                         "JOIN follows f ON f.channel_id = c.channel_id "
+                         "WHERE c.platform = 'youtube' AND c.has_shorts = 1")
+    elif platform == "tiktok" and TIKTOK_ENABLED:
         queue.append("SELECT c.channel_id, c.channel_url, c.platform, 'shorts' AS tab, "
                      "c.shorts_refreshed_at AS age FROM channels c "
                      "JOIN follows f ON f.channel_id = c.channel_id "
@@ -549,7 +547,8 @@ def stalest_slot():
         # before the first Shorts one: hours before a shorts page shows anything.
         return conn.execute(
             f"SELECT * FROM ({' UNION ALL '.join(queue)}) WHERE age < ? "
-            "ORDER BY age, tab = ? LIMIT 1", (cutoff, last_tab)).fetchone()
+            "ORDER BY age, tab = ? LIMIT 1",
+            (cutoff, BUDGETS[platform].last_tab)).fetchone()
 
 
 def note_failure(row, error):
@@ -574,28 +573,29 @@ def note_failure(row, error):
                      (time.time(), row["channel_id"]))
 
 
-def feed_poller():
-    """One tab per tick, oldest first, for the whole instance.
+def feed_poller(platform):
+    """One tab per tick, oldest first, for one platform.
 
     This is the whole automatic refresh: no burst when someone opens the page,
     and a ceiling on outbound lookups that does not move with the number of
-    users, channels or pages enabled.
+    users, channels or pages enabled. One of these runs per platform, so a
+    platform never waits on another's turn.
     """
-    global last_tab
+    budget = BUDGETS[platform]
     while True:
         time.sleep(FEED_POLL)
         row = None
         try:
-            row = stalest_slot()
+            row = stalest_slot(platform)
             if not row:
                 continue
-            last_tab = row["tab"]
+            budget.last_tab = row["tab"]
             if row["tab"] == "shorts":
                 refresh_shorts(row["channel_url"], row["channel_id"], row["platform"])
             else:
                 refresh_channel(row["channel_url"], row["channel_id"])
         except Exception as e:
-            app.logger.warning("feed refresh failed: %s", e)
+            app.logger.warning("%s refresh failed: %s", platform, e)
             if row is not None:
                 note_failure(row, e)
 
@@ -676,17 +676,32 @@ def run_download(job_id, url, format_choice, format_id, title, max_height=None,
         update_entry(job_id, status="error", error=str(e))
 
 
-# Held for the whole of a channel lookup, so two refreshes can never talk to
-# YouTube at the same time whoever asked for them.
-feed_lock = threading.Lock()
-# Which tab the last lookup was for, so ties alternate rather than starving one.
-last_tab = "shorts"
-last_channel_call = 0.0
+class Budget:
+    """One platform's outbound allowance: a lock and a clock.
+
+    Spacing exists to avoid being refused by a provider, and a provider only
+    sees its own traffic: YouTube does not know what TikTok was asked. Sharing
+    one budget made each platform pay for the other's curiosity while
+    protecting neither, so every platform holds its own.
+
+    The lock covers a whole lookup, so two refreshes of the same platform can
+    never talk to it at once, whoever asked for them.
+    """
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.last_call = 0.0
+        # Which tab went last, so ties alternate rather than starving one.
+        # Only YouTube has two, but every platform carries the field.
+        self.last_tab = "shorts"
 
 
-def channel_call_allowed():
-    """Space out lookups, whatever triggered them."""
-    return time.time() - last_channel_call >= FEED_POLL
+BUDGETS = {"youtube": Budget(), "tiktok": Budget()}
+
+
+def channel_call_allowed(platform):
+    """Space out lookups of one platform, whatever triggered them."""
+    return time.time() - BUDGETS[platform].last_call >= FEED_POLL
 
 
 def get_settings(owner):
@@ -922,11 +937,10 @@ def fetch_shorts(url, count):
 
 
 def refresh_shorts(url, channel_id, platform="youtube"):
-    """One account's upright videos, under the same lock and the same clock as a
-    feed refresh: every source shares one outbound budget."""
-    global last_channel_call
-    with feed_lock:
-        last_channel_call = time.time()
+    """One account's upright videos, under its own platform's budget."""
+    budget = BUDGETS[platform]
+    with budget.lock:
+        budget.last_call = time.time()
         shorts = (fetch_tiktok(url, FEED_VIDEOS_MAX)["videos"] if platform == "tiktok"
                   else fetch_shorts(url, FEED_VIDEOS_MAX))
     with connect() as conn:
@@ -940,12 +954,11 @@ def refresh_channel(url, channel_id=None):
     """Look a channel up once, for everyone who follows it.
 
     The cache is keyed by channel, not by subscriber: with the outbound rate
-    capped instance-wide, storing it per account would have spent that budget
-    as many times as there are people following the same channel, which in a
-    household is the common case rather than the edge one. It holds the
+    capped for the whole platform, storing it per account would have spent that
+    budget as many times as there are people following the same channel, which
+    in a household is the common case rather than the edge one. It holds the
     instance maximum; each account displays as many as it asked for.
     """
-    global last_channel_call
     known = {}
     if channel_id:
         with connect() as conn:
@@ -953,8 +966,9 @@ def refresh_channel(url, channel_id=None):
                                (channel_id,)).fetchone()
         if row:
             known = {v["id"]: v for v in json.loads(row["videos"]) if v.get("id")}
-    with feed_lock:
-        last_channel_call = time.time()
+    budget = BUDGETS["youtube"]
+    with budget.lock:
+        budget.last_call = time.time()
         channel = fetch_channel(url, known, FEED_VIDEOS_MAX)
     with connect() as conn:
         conn.execute("INSERT INTO channels "
@@ -1188,7 +1202,7 @@ def subscribe():
     url = (request.json or {}).get("url", "").strip()
     if not is_safe_url(url) or not youtube_videos_url(url):
         return jsonify({"error": "Please enter a YouTube channel URL"}), 400
-    return follow(owner, url, refresh_channel)
+    return follow(owner, url, refresh_channel, "youtube")
 
 
 @app.route("/api/tiktok/accounts", methods=["POST"])
@@ -1197,20 +1211,26 @@ def add_tiktok_account():
     url = (request.json or {}).get("url", "").strip()
     if not is_safe_url(url) or not tiktok_user_url(url):
         return jsonify({"error": "Please enter a TikTok account URL"}), 400
-    return follow(owner, url, follow_tiktok)
+    return follow(owner, url, follow_tiktok, "tiktok")
 
 
-def follow(owner, url, fetch):
-    """Record who someone follows, whatever page they follow it from.
+def followed_count(owner, platform):
+    """How many of one platform this account follows.
 
-    The ceiling counts every source together: what it protects is the outbound
-    rate, which is shared, not a page.
+    Counted per platform because the ceiling protects one provider's patience,
+    and a provider only sees its own traffic: following TikTok accounts must
+    not cost YouTube channels.
     """
     with connect() as conn:
-        followed = conn.execute("SELECT count(*) FROM follows WHERE owner = ?",
-                                (owner,)).fetchone()[0]
-    if followed >= FEED_CHANNELS_MAX:
-        return jsonify({"error": f"At most {FEED_CHANNELS_MAX} channels"}), 400
+        return conn.execute(
+            "SELECT count(*) FROM follows f JOIN channels c ON c.channel_id = f.channel_id "
+            "WHERE f.owner = ? AND c.platform = ?", (owner, platform)).fetchone()[0]
+
+
+def follow(owner, url, fetch, platform):
+    """Record who someone follows, whatever page they follow it from."""
+    if followed_count(owner, platform) >= FEED_CHANNELS_MAX:
+        return jsonify({"error": f"At most {FEED_CHANNELS_MAX} {platform} accounts"}), 400
     try:
         channel = fetch(url)
     except subprocess.TimeoutExpired:
@@ -1240,9 +1260,9 @@ def follow_tiktok(url):
     An upright video is an upright video: putting them where the shorts page
     already looks is what makes one page serve both sources.
     """
-    global last_channel_call
-    with feed_lock:
-        last_channel_call = time.time()
+    budget = BUDGETS["tiktok"]
+    with budget.lock:
+        budget.last_call = time.time()
         account = fetch_tiktok(url, FEED_VIDEOS_MAX)
     account["channel_id"] = tiktok_channel_id(account["channel_url"], account["channel_id"])
     with connect() as conn:
@@ -1277,6 +1297,7 @@ def import_subscriptions():
     with connect() as conn:
         followed = {r["channel_id"] for r in conn.execute(
             "SELECT channel_id FROM follows WHERE owner = ?", (owner,))}
+    held = followed_count(owner, "youtube")
 
     added, already, skipped, full = 0, 0, 0, False
     for row in csv.reader(io.StringIO(text)):
@@ -1294,7 +1315,7 @@ def import_subscriptions():
         if channel_id in followed:
             already += 1
             continue
-        if len(followed) >= FEED_CHANNELS_MAX:
+        if held >= FEED_CHANNELS_MAX:
             full = True
             break
         with connect() as conn:
@@ -1308,6 +1329,7 @@ def import_subscriptions():
             conn.execute("INSERT OR IGNORE INTO follows (owner, channel_id) VALUES (?, ?)",
                          (owner, channel_id))
         followed.add(channel_id)
+        held += 1
         added += 1
 
     if not (added or already or skipped):
@@ -1335,6 +1357,7 @@ def import_tiktok():
     with connect() as conn:
         followed = {r["channel_id"] for r in conn.execute(
             "SELECT channel_id FROM follows WHERE owner = ?", (owner,))}
+    held = followed_count(owner, "tiktok")
 
     added, already, skipped, full = 0, 0, 0, False
     for name in names[:1000]:
@@ -1346,7 +1369,7 @@ def import_tiktok():
         if channel_id in followed:
             already += 1
             continue
-        if len(followed) >= FEED_CHANNELS_MAX:
+        if held >= FEED_CHANNELS_MAX:
             full = True
             break
         with connect() as conn:
@@ -1360,6 +1383,7 @@ def import_tiktok():
             conn.execute("INSERT OR IGNORE INTO follows (owner, channel_id) VALUES (?, ?)",
                          (owner, channel_id))
         followed.add(channel_id)
+        held += 1
         added += 1
 
     if not (added or already or skipped):
@@ -1399,7 +1423,7 @@ def refresh_feed():
     # not become a burst of them.
     if not force and time.time() - last < FEED_COOLDOWN:
         return jsonify({"ok": True, "skipped": "recent"})
-    if not force and not channel_call_allowed():
+    if not force and not channel_call_allowed(row["platform"]):
         return jsonify({"ok": True, "skipped": "busy"})
     try:
         if upright:
@@ -1911,11 +1935,14 @@ def download_file(job_id):
     return send_file(row["path"], as_attachment=True, download_name=row["filename"])
 
 
-# Started last: the poller reaches for everything below it, and a thread that
-# outruns its own module is a bug waiting for a slow import. Not started at all
-# when the feed is off: nothing must talk to YouTube on its own then.
-if FEED_ENABLED or TIKTOK_ENABLED:
-    threading.Thread(target=feed_poller, daemon=True).start()
+# Started last: a poller reaches for everything below it, and a thread that
+# outruns its own module is a bug waiting for a slow import. One per platform
+# that has a page open, and none at all otherwise: nothing must talk to a
+# provider on its own then.
+POLLED = {"youtube": FEED_ENABLED or SHORTS_ENABLED, "tiktok": TIKTOK_ENABLED}
+for _platform, _wanted in POLLED.items():
+    if _wanted:
+        threading.Thread(target=feed_poller, args=(_platform,), daemon=True).start()
 
 
 if __name__ == "__main__":
