@@ -203,10 +203,6 @@ MIGRATIONS = [
     ALTER TABLE channels ADD COLUMN platform TEXT NOT NULL DEFAULT 'youtube';
     """,
     """
-    ALTER TABLE channels ADD COLUMN has_videos INTEGER NOT NULL DEFAULT 1;
-    ALTER TABLE channels ADD COLUMN has_shorts INTEGER NOT NULL DEFAULT 1;
-    """,
-    """
     CREATE TABLE shares (
         token      TEXT PRIMARY KEY,
         job_id     TEXT NOT NULL,
@@ -215,6 +211,10 @@ MIGRATIONS = [
         expires_at REAL NOT NULL
     );
     CREATE INDEX shares_job ON shares (job_id);
+    """,
+    """
+    ALTER TABLE channels ADD COLUMN has_videos INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE channels ADD COLUMN has_shorts INTEGER NOT NULL DEFAULT 1;
     """,
 ]
 
