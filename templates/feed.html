@@ -9,21 +9,26 @@
     {% set tagline = "Your channels, newest first" %}
     {% include "_header.html" %}
 
-    <form class="feed-add" id="addForm">
-      <input id="channelUrl" type="url" placeholder="Paste a YouTube channel URL…" required>
-      <button class="fetch-btn" id="addBtn">Add channel</button>
-    </form>
-    <p class="hint" id="message">Add a channel to see its latest videos.</p>
-
-    <div class="feed-head" id="feedHead" hidden>
+    <div class="feed-head" id="feedHead">
       <span id="videoCount"></span>
       <span class="feed-head-actions">
+        <button class="link-btn" id="addBtn">Add channels</button>
         <button class="link-btn" id="layoutBtn">Grid</button>
         <button class="link-btn" id="settingsBtn">Settings</button>
         <button class="link-btn" id="refreshBtn">Refresh feed</button>
       </span>
     </div>
-    <div class="feed-settings" id="settings" hidden>
+    <div class="feed-panel feed-add-panel" id="addPanel" hidden>
+      <form class="feed-add" id="addForm">
+        <input id="channelUrl" type="url" placeholder="Paste a YouTube channel URL…" required>
+        <button class="fetch-btn" id="addSubmit">Add</button>
+      </form>
+      <label class="feed-import">
+        <span>Or import subscriptions.csv from a YouTube export</span>
+        <input type="file" id="importFile" accept=".csv,text/csv">
+      </label>
+    </div>
+    <div class="feed-panel feed-settings" id="settings" hidden>
       <label>Quality
         <span class="pill-group" id="qualityPills"></span>
       </label>
@@ -31,6 +36,7 @@
         <span class="pill-group" id="countPills"></span>
       </label>
     </div>
+    <p class="hint" id="message">Add a channel to see its latest videos.</p>
     <div class="cards grid" id="videos"></div>
     <div class="subscriptions" id="subscriptions" hidden>
       <div class="history-head">Channels</div>
@@ -69,8 +75,16 @@
         actions: `<button class="card-dl-btn" id="save-${i}" onclick="saveVideo(${i})">${
           v.ready ? 'Save' : 'Download'}</button>`,
       })).join('');
-      document.getElementById('feedHead').hidden = !data.channels.length;
-      document.getElementById('videoCount').textContent = `${data.videos.length} latest video${data.videos.length === 1 ? '' : 's'}`;
+      // The head is the only way to add a channel, so it stays even when there
+      // is nothing yet. What it offers is what makes sense at that moment.
+      const empty = !data.channels.length;
+      document.getElementById('videoCount').textContent = empty
+        ? 'No channels yet'
+        : `${data.videos.length} video${data.videos.length === 1 ? '' : 's'} from ${data.channels.length} channel${data.channels.length === 1 ? '' : 's'}`;
+      document.getElementById('layoutBtn').hidden = !data.videos.length;
+      document.getElementById('settingsBtn').hidden = empty;
+      document.getElementById('refreshBtn').hidden = empty;
+      if (empty) document.getElementById('addPanel').hidden = false;
       const list = document.getElementById('channelList');
       list.innerHTML = data.channels.map(c => `<div class="channel-row"><span>${esc(c.title)}</span><button class="row-btn" onclick="removeChannel('${esc(c.channel_id)}')">Remove</button></div>`).join('');
       document.getElementById('subscriptions').hidden = !data.channels.length;
@@ -110,14 +124,20 @@
       message('Saved.');
     }
 
-    document.getElementById('settingsBtn').addEventListener('click', () => {
-      const panel = document.getElementById('settings');
+    /* Two folded panels, one behaviour: opening one closes the other, so the
+       page never grows two headers of controls at once. */
+    function togglePanel(id) {
+      const panel = document.getElementById(id);
+      const other = document.getElementById(id === 'settings' ? 'addPanel' : 'settings');
+      other.hidden = true;
       panel.hidden = !panel.hidden;
-    });
+    }
+    document.getElementById('settingsBtn').addEventListener('click', () => togglePanel('settings'));
+    document.getElementById('addBtn').addEventListener('click', () => togglePanel('addPanel'));
 
     document.getElementById('addForm').addEventListener('submit', async e => {
       e.preventDefault();
-      const button = document.getElementById('addBtn');
+      const button = document.getElementById('addSubmit');
       button.disabled = true; button.textContent = 'Adding…'; message('Looking up channel…');
       try {
         const res = await fetch('/api/feed/subscriptions', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url: document.getElementById('channelUrl').value})});
@@ -125,7 +145,31 @@
         if (!res.ok) throw new Error(data.error || 'Could not add channel');
         document.getElementById('channelUrl').value = ''; message('Channel added.'); await load();
       } catch (err) { message(friendlyError(err.message), true); }
-      button.disabled = false; button.textContent = 'Add channel';
+      button.disabled = false; button.textContent = 'Add';
+    });
+
+    /* An import follows nobody's channels at once and looks none of them up:
+       the poller fills them one at a time, which is the whole point. */
+    document.getElementById('importFile').addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      message('Reading the file…');
+      try {
+        const res = await fetch('/api/feed/import', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({csv: await file.text()}),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'Could not read this file');
+        await load();
+        const parts = [`${d.added} channel${d.added === 1 ? '' : 's'} added`];
+        if (d.already) parts.push(`${d.already} already followed`);
+        if (d.skipped) parts.push(`${d.skipped} unreadable`);
+        if (d.full) parts.push(`stopped at the ${d.limit} channel limit`);
+        message(`${parts.join(', ')}. Videos arrive one channel every ${Math.round(d.every / 60)} min.`);
+      } catch (err) { message(friendlyError(err.message), true); }
+      e.target.value = '';
     });
     document.getElementById('refreshBtn').addEventListener('click', async () => {
       const button = document.getElementById('refreshBtn');

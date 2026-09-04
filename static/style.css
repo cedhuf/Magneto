@@ -968,18 +968,53 @@ audio.modal-media {
 .icon-btn.danger:hover { color: var(--error); border-color: var(--error-border); }
 
 
-/* Feed settings: folded away, and built from the same pills as the format
-   switch rather than a second kind of control. */
-.feed-head-actions { display: flex; gap: 14px; }
-.feed-settings {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
+/* Two folded panels, one shell: the settings, and the ways to add a channel.
+   Both are built from the same pills and fields as the rest of the app rather
+   than from a second kind of control. */
+.feed-head-actions { display: flex; flex-wrap: wrap; gap: 14px; }
+.feed-panel {
   margin-bottom: 18px;
   padding: 14px 16px;
   border: 1.5px solid var(--card-border);
   border-radius: var(--radius);
   background: var(--card);
+}
+.feed-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+.feed-add-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.feed-import {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.68rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.feed-import input[type="file"] { font: 0.7rem 'DM Mono', monospace; color: var(--muted); }
+.feed-import input[type="file"]::file-selector-button {
+  margin-right: 10px;
+  padding: 6px 12px;
+  border: 1.5px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 0.7rem 'DM Mono', monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.feed-import input[type="file"]::file-selector-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 .feed-settings label {
   display: flex;

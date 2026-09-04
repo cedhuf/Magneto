@@ -1,5 +1,7 @@
+import io
 import os
 import re
+import csv
 import time
 import uuid
 import glob
@@ -50,6 +52,9 @@ SWEEP_INTERVAL = 60
 # that has never asked for anything is refused with "Sign in to confirm you're
 # not a bot" while the same request over v4, from the same machine, goes
 # through. Set RECLIP_FORCE_IPV4=0 on a host that has no v4 route at all.
+# A subscriptions export is a few kilobytes; anything far past that is not one.
+IMPORT_MAX_BYTES = 2 * 1024 * 1024
+
 FORCE_IPV4 = os.environ.get("RECLIP_FORCE_IPV4", "1") not in ("0", "false", "no", "")
 # Every invocation starts from here, so the flag cannot be forgotten on one.
 YTDLP = ["yt-dlp"] + (["--force-ipv4"] if FORCE_IPV4 else [])
@@ -774,6 +779,66 @@ def subscribe():
         conn.execute("INSERT OR IGNORE INTO follows (owner, channel_id) VALUES (?, ?)",
                      (owner, channel["channel_id"]))
     return jsonify(channel)
+
+
+@app.route("/api/feed/import", methods=["POST"])
+def import_subscriptions():
+    """Take the subscriptions.csv of a YouTube export.
+
+    Nothing is looked up here. The file already carries the id, the URL and the
+    title, so a channel is followed at once and left empty; the poller fills it
+    in its turn like any other. Looking a hundred channels up on import would be
+    a hundred requests to YouTube in one breath, which is exactly what gets an
+    address refused.
+    """
+    owner = current_user()
+    text = (request.json or {}).get("csv", "")
+    if not isinstance(text, str) or not text.strip():
+        return jsonify({"error": "Empty file"}), 400
+    if len(text) > IMPORT_MAX_BYTES:
+        return jsonify({"error": "File too large"}), 400
+
+    with connect() as conn:
+        followed = {r["channel_id"] for r in conn.execute(
+            "SELECT channel_id FROM follows WHERE owner = ?", (owner,))}
+
+    added, already, skipped, full = 0, 0, 0, False
+    for row in csv.reader(io.StringIO(text)):
+        # The header is localised, so it is recognised by its shape rather than
+        # by its wording: a channel id is the only first cell that looks like one.
+        if len(row) < 2 or not re.fullmatch(r"UC[\w-]{22}", row[0].strip()):
+            continue
+        channel_id = row[0].strip()
+        url = row[1].strip()
+        # A title may hold commas, so it is whatever is left of the line.
+        title = ",".join(row[2:]).strip() or channel_id
+        if not is_safe_url(url) or not youtube_videos_url(url):
+            skipped += 1
+            continue
+        if channel_id in followed:
+            already += 1
+            continue
+        if len(followed) >= FEED_CHANNELS_MAX:
+            full = True
+            break
+        with connect() as conn:
+            # An empty cache dated zero makes the channel the stalest there is,
+            # so the poller takes the freshly imported ones first.
+            conn.execute("INSERT INTO channels "
+                         "(channel_id, channel_url, title, thumbnail, videos, refreshed_at) "
+                         "VALUES (?, ?, ?, '', '[]', 0) "
+                         "ON CONFLICT(channel_id) DO NOTHING",
+                         (channel_id, url, title))
+            conn.execute("INSERT OR IGNORE INTO follows (owner, channel_id) VALUES (?, ?)",
+                         (owner, channel_id))
+        followed.add(channel_id)
+        added += 1
+
+    if not (added or already or skipped):
+        return jsonify({"error": "No channels found in this file"}), 400
+    return jsonify({"added": added, "already": already, "skipped": skipped,
+                    "full": full, "limit": FEED_CHANNELS_MAX,
+                    "every": FEED_POLL})
 
 
 @app.route("/api/feed/refresh", methods=["POST"])

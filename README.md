@@ -48,10 +48,13 @@ docker build -t reclip . && docker run -p 8899:8899 reclip
 ### Feed
 
 Open **Feed** to follow YouTube channels. ReClip stores each channel's latest
-videos and merges them into a compact, newest-first grid. **Settings** sets the
-quality and how many videos to keep per channel, for the whole feed rather than
-per video: a feed is read more than it is archived. **Refresh feed** updates one
-channel per request, so the wait is visible.
+videos and merges them into a compact, newest-first grid. **Add channels** takes
+a channel URL, or the `subscriptions.csv` of a YouTube export: importing follows
+every channel at once and looks none of them up, so the poller fills them one at
+a time instead of asking YouTube a hundred times in one breath. **Settings** sets
+the quality and how many videos to keep per channel, for the whole feed rather
+than per video: a feed is read more than it is archived. **Refresh feed** updates
+one channel per request, so the wait is visible.
 
 Playing a feed video downloads it first, then plays the instance's own file.
 Nothing is embedded from YouTube.
