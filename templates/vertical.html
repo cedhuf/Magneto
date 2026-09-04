@@ -11,17 +11,11 @@
   <div class="page">
     {% include "_header.html" %}
 
-    <div class="feed-head" id="feedHead">
-      <span id="clipCount"></span>
-      <span class="feed-head-actions">
-        <button class="link-btn" id="watchedBtn">Show watched</button>
-      </span>
-    </div>
-
     <div class="shorts" id="stage">
       <div class="shorts-frame" id="frame" hidden>
         <div class="shorts-reel" id="reel"></div>
         <div class="shorts-rail">
+          <button class="round-btn" id="watchedBtn" onclick="toggleWatched()"></button>
           <button class="round-btn" id="fullBtn" onclick="toggleFull()"
                   title="Full screen (f)" aria-label="Full screen"></button>
           <button class="round-btn" id="prevBtn" onclick="step(-1)"
@@ -184,14 +178,15 @@
       }).catch(() => {});
     }
 
-    /* The bar says what the reel holds, and the empty card has two things to
-       say: nothing followed yet, or everything watched. */
+    /* The empty card has two things to say: nothing followed yet, or everything
+       watched. And the reel offers to bring back what it dropped, but only once
+       it has dropped something. */
     function renderCount() {
-      document.getElementById('clipCount').textContent =
-        `${clips.length} clip${clips.length === 1 ? '' : 's'}`;
       const button = document.getElementById('watchedBtn');
-      button.textContent = watched ? 'Hide watched' : 'Show watched';
-      button.hidden = !watched && !hidden && !clips.length;
+      button.innerHTML = icon('eye');
+      button.classList[watched ? 'add' : 'remove']('on');
+      button.title = watched ? 'Hide watched' : 'Show watched';
+      button.hidden = !watched && !hidden;
       const caughtUp = !clips.length && hidden > 0;
       document.getElementById('emptyTitle').textContent =
         caughtUp ? 'You are up to date' : 'Nothing to watch';
@@ -200,12 +195,12 @@
         : EMPTY_NOTE;
     }
 
-    document.getElementById('watchedBtn').addEventListener('click', async () => {
+    async function toggleWatched() {
       watched = !watched;
       at = 0;
       reading = -1;
       await load();
-    });
+    }
 
     /* One video element for the whole reel, moved from slide to slide.
 

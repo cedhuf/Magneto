@@ -999,14 +999,14 @@ audio.modal-media {
    That single number is --stage: the height the video may take once the
    header, the caption and the page's own margins have had theirs. */
 .shorts {
-  --chrome: 285px;
+  --chrome: 225px;
   --stage: clamp(360px, calc(100dvh - var(--chrome)), 900px);
   /* The cap is for a page that also holds a header. Full screen has none. */
   display: flex;
   flex-direction: column;
   align-items: center;
 }
-/* Both pages carry the same bar above the frame now. */
+/* Nothing sits above the frame: the page is the video and its rail. */
 /* Only the bottom margin is given back to the video. Everything above the frame
    keeps the spacing of every other page, or the header would sit at a different
    height here and move as you walk between the tabs. */
