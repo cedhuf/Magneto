@@ -331,9 +331,11 @@ textarea::placeholder { color: var(--muted); }
 .cards { margin-top: 24px; }
 /* Rows by default. The grid modifier reuses the stacked shape the small-screen
    rules already define, rather than describing a second card. */
+/* 200 rather than 230: the page is 952px wide inside its padding, where a 230
+   minimum works out at 3.98 tracks and so lays out three. Four fit. */
 .cards.grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 12px;
   align-items: start;
 }
@@ -364,13 +366,23 @@ textarea::placeholder { color: var(--muted); }
   align-items: stretch;
   margin: 10px 12px 12px;
 }
+/* Laid down, the icons must not be squeezed by the action taking all it can,
+   nor pushed out of a block that hides what overflows it. They keep a size a
+   finger can hit, and the label gives way instead. */
 .cards.grid .card-icons {
+  flex: 0 0 auto;
   border-top: none;
   border-left: 1.5px solid var(--card-border);
 }
-/* Laid down, the icons would be squeezed by the action taking all it can: they
-   keep a size a finger can hit instead. */
-.cards.grid .card-icons .icon-btn { flex: 0 0 42px; }
+.cards.grid .card-icons .icon-btn { flex: 0 0 40px; }
+.cards.grid .card-side .card-dl-btn {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: center;
+}
 
 /* Admin */
 .brand-actions {
@@ -1054,8 +1066,20 @@ audio.modal-media {
     align-items: stretch;
     margin: 10px 14px 14px;
   }
-  .card-icons { border-top: none; border-left: 1.5px solid var(--card-border); }
+  .card-icons {
+    flex: 0 0 auto;
+    border-top: none;
+    border-left: 1.5px solid var(--card-border);
+  }
   .card-icons .icon-btn { flex: 0 0 46px; }
+  .card-side .card-dl-btn {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-align: center;
+  }
   .card-title { white-space: normal; }
   .controls { flex-wrap: wrap; }
   .fetch-btn { width: 100%; }
