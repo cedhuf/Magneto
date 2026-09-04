@@ -356,14 +356,17 @@ textarea::placeholder { color: var(--muted); }
   overflow: hidden;
 }
 .cards.grid .card { height: 100%; }
-/* A tile is already a column, so the frame lies down along its foot. */
+/* A tile is already a column, so the block lies down along its foot: the action
+   takes the room it can, the icons keep their own. */
 .cards.grid .card-side {
   flex: 0 0 auto;
   flex-direction: row;
-  align-items: center;
-  width: 100%;
-  padding: 12px 14px 14px;
-  border-left: none;
+  align-items: stretch;
+  margin: 0 12px 12px;
+}
+.cards.grid .card-icons {
+  border-top: none;
+  border-left: 1.5px solid var(--card-border);
 }
 
 /* Admin */
@@ -515,7 +518,6 @@ textarea::placeholder { color: var(--muted); }
 
 .card.expanded { align-items: flex-start; }
 .card.expanded .card-thumb { height: 96px; align-self: auto; }
-.card.expanded .card-side { justify-content: flex-start; padding-top: 14px; }
 
 /* Flush to the card's left, top and bottom edges: the card's own radius and
    overflow do the rounding, the image has none of its own. */
@@ -683,21 +685,47 @@ audio.modal-media {
 
 /* The action column has a width of its own, so nothing in the text can push
    the buttons around, and the buttons line up down the list. */
-/* A column of its own on the right, one fixed width for every card so the
-   buttons line up down the list: the action on top, what acts on the entry
-   underneath. A hairline rather than a filled panel, the card is already one. */
+/* One block rather than three buttons: a single outline, a single radius, and
+   hairlines between the segments. Fixed width, so the blocks line up down the
+   list whatever the labels say. */
 .card-side {
-  flex: 0 0 132px;
+  flex: 0 0 128px;
+  margin: 12px 12px 12px 0;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 12px 14px;
-  border-left: 1.5px solid var(--card-border);
+  border: 1.5px solid var(--card-border);
+  border-radius: 10px;
+  overflow: hidden;
 }
-.card-side .card-dl-btn,
-.card-side .card-status { justify-content: center; text-align: center; }
-.card-icons { display: flex; justify-content: center; gap: 2px; }
+/* The segments give up their own frame: the block carries it now. */
+.card-side .card-dl-btn {
+  flex: 1;
+  justify-content: center;
+  border: none;
+  border-radius: 0;
+  padding: 8px 10px;
+}
+.card-side .card-status {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  text-align: center;
+}
+.card-icons { display: flex; border-top: 1.5px solid var(--card-border); }
+.card-icons .icon-btn {
+  flex: 1;
+  width: auto;
+  /* Stretched rather than sized: the segment is as tall as the block's row. */
+  height: auto;
+  min-height: 32px;
+  border: none;
+  border-radius: 0;
+}
+.card-icons .icon-btn:hover { background: var(--fg-wash); color: var(--fg); }
+.card-icons .icon-btn + .icon-btn { border-left: 1.5px solid var(--card-border); }
 .card-note-row { margin-top: 5px; }
 
 /* Folded by default: a row keeps its height until someone asks for more. */
@@ -999,12 +1027,10 @@ audio.modal-media {
   .card-side {
     flex: 0 0 auto;
     flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    padding: 12px 14px 14px;
-    border-left: none;
+    align-items: stretch;
+    margin: 0 14px 14px;
   }
+  .card-icons { border-top: none; border-left: 1.5px solid var(--card-border); }
   .card-title { white-space: normal; }
   .controls { flex-wrap: wrap; }
   .fetch-btn { width: 100%; }
