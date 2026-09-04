@@ -318,6 +318,14 @@
         note = '<span class="card-note">no longer on server</span>';
       }
 
+      const meta = [c.uploader, c.duration ? fmtDur(c.duration) : '',
+                    fmtDate(c.upload_date)].filter(Boolean).map(esc);
+      // Links and sponsor blocks make modern descriptions unreadable inline, so
+      // it stays folded and is shown as plain text, never as live links.
+      const descToggle = c.description
+        ? `<button class="link-btn" onclick="toggleDesc(${idx})">Description</button>`
+        : '';
+
       const badges = [];
       if (c.status === 'done') badges.push({text: ttlLabel(c), id: `ttl-${idx}`});
 
