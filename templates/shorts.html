@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% set page_title = "ReClip — Shorts" %}
+  {% include "_head.html" %}
+</head>
+<body>
+  <div class="page">
+    {% set tagline = "Shorts from your channels" %}
+    {% include "_header.html" %}
+
+    <div class="shorts" id="stage">
+      <div class="shorts-frame">
+        <div class="shorts-media" id="media"></div>
+        <div class="shorts-caption">
+          <div class="shorts-title" id="title"></div>
+          <div class="shorts-meta" id="meta"></div>
+        </div>
+        <div class="shorts-side">
+          <button class="icon-btn" id="prevBtn" onclick="step(-1)" title="Previous (up)" aria-label="Previous"></button>
+          <button class="icon-btn" id="nextBtn" onclick="step(1)" title="Next (down)" aria-label="Next"></button>
+          <span id="removeSlot"></span>
+        </div>
+      </div>
+      <p class="hint" id="message" hidden></p>
+    </div>
+  </div>
+
+  <script src="/static/icons.js"></script>
+  <script src="/static/format.js"></script>
+  <script src="/static/delete.js"></script>
+  <script>
+    let shorts = [];
+    let at = 0;
+    let quality = 720;
+
+    function message(text, error = false) {
+      const el = document.getElementById('message');
+      el.textContent = text;
+      el.hidden = !text;
+      el.style.color = error ? 'var(--error)' : '';
+    }
+
+    async function load() {
+      const res = await fetch('/api/shorts');
+      if (!res.ok) return;
+      const data = await res.json();
+      shorts = data.shorts;
+      quality = data.quality;
+      document.getElementById('prevBtn').innerHTML = icon('up');
+      document.getElementById('nextBtn').innerHTML = icon('down');
+      render();
+    }
+
+    /* One at a time, and the file is the instance's own: a short is played the
+       way everything else here is, never through an embed. */
+    function render() {
+      const short = shorts[at];
+      const media = document.getElementById('media');
+      if (!short) {
+        media.innerHTML = '';
+        document.getElementById('title').textContent = 'Nothing to watch';
+        document.getElementById('meta').textContent =
+          'Follow channels on the feed page, then wait for their shorts to be listed.';
+        document.getElementById('removeSlot').innerHTML = '';
+        return;
+      }
+      document.getElementById('title').textContent = short.title;
+      document.getElementById('meta').textContent =
+        `${short.uploader} · ${at + 1} of ${shorts.length}`;
+      document.getElementById('removeSlot').innerHTML = short.job_id
+        ? deleteButton('removeShort()', {icon: true, label: 'Delete'})
+        : '';
+      media.innerHTML = short.job_id
+        ? `<video class="shorts-video" src="/api/stream/${encodeURIComponent(short.job_id)}"
+             controls autoplay playsinline></video>`
+        : `<div class="shorts-poster">
+             ${short.thumbnail ? `<img src="${esc(short.thumbnail)}" alt="">` : ''}
+             <span class="shorts-note" id="note">Press play to fetch it</span>
+           </div>`;
+      if (!short.job_id) fetchShort(at, true);
+      // One ahead, so the next swipe does not wait on a download. Never more:
+      // every extra one is a video nobody has asked to watch.
+      if (shorts[at + 1] && !shorts[at + 1].job_id) fetchShort(at + 1, false);
+    }
+
+    async function fetchShort(index, showing) {
+      const short = shorts[index];
+      if (!short || short.job_id || short.fetching) return;
+      short.fetching = true;
+      if (showing) {
+        const note = document.getElementById('note');
+        if (note) note.textContent = 'Fetching…';
+      }
+      try {
+        const res = await fetch('/api/download', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            url: short.url, format: 'video', kind: 'short', max_height: quality,
+            title: short.title, thumbnail: short.thumbnail, uploader: short.uploader,
+          }),
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        const done = await waitForFile(data.job_id);
+        short.job_id = data.job_id;
+        short.filename = done.filename;
+        if (index === at) render();
+      } catch (err) {
+        if (index === at) message(friendlyError(err.message), true);
+      }
+      short.fetching = false;
+    }
+
+    function waitForFile(jobId) {
+      return new Promise((resolve, reject) => {
+        const poll = setInterval(async () => {
+          try {
+            const res = await fetch(`/api/status/${jobId}`);
+            const data = await res.json();
+            if (data.status === 'done') { clearInterval(poll); resolve(data); }
+            else if (data.status === 'error') { clearInterval(poll); reject(new Error(data.error)); }
+          } catch (e) { clearInterval(poll); reject(e); }
+        }, 1000);
+      });
+    }
+
+    function step(by) {
+      const next = at + by;
+      if (next < 0 || next >= shorts.length) return;
+      at = next;
+      message('');
+      render();
+    }
+
+    async function removeShort() {
+      const short = shorts[at];
+      if (!short || !short.job_id) return;
+      await fetch(`/api/entries/${short.job_id}`, {method: 'DELETE'});
+      shorts.splice(at, 1);
+      if (at >= shorts.length) at = Math.max(0, shorts.length - 1);
+      render();
+    }
+
+    /* A shorts feed is read with a thumb; here it is read with a keyboard. */
+    document.addEventListener('keydown', e => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === 'ArrowDown' || e.key === 'j') { e.preventDefault(); step(1); }
+      else if (e.key === 'ArrowUp' || e.key === 'k') { e.preventDefault(); step(-1); }
+      else if (e.key === ' ') {
+        const video = document.querySelector('.shorts-video');
+        if (!video) return;
+        e.preventDefault();
+        video.paused ? video.play() : video.pause();
+      }
+    });
+
+    load();
+  </script>
+  <script src="/static/theme.js"></script>
+</body>
+</html>

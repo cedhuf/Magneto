@@ -18,7 +18,12 @@
       <a class="text-btn{{ ' active' if page == 'admin' }}" href="/admin">Admin</a>
     {% endif %}
     <a class="text-btn{{ ' active' if page == 'home' }}" href="/">Home</a>
-    <a class="text-btn{{ ' active' if page == 'feed' }}" href="/feed">Feed</a>
+    {% if feed %}
+      <a class="text-btn{{ ' active' if page == 'feed' }}" href="/feed">Feed</a>
+    {% endif %}
+    {% if shorts %}
+      <a class="text-btn{{ ' active' if page == 'shorts' }}" href="/shorts">Shorts</a>
+    {% endif %}
     {% if auth == 'proxy' and logout_url %}
       <a class="text-btn" href="{{ logout_url }}">Sign out</a>
     {% endif %}

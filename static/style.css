@@ -913,6 +913,62 @@ audio.modal-media {
 }
 .footer-note a:hover { border-bottom-color: var(--accent); }
 
+/* Shorts: one at a time, in the shape they were filmed in. The page holds a
+   single frame rather than a list, so nothing here is a card. */
+.shorts { display: flex; flex-direction: column; align-items: center; margin-top: 28px; }
+.shorts-frame {
+  display: grid;
+  grid-template-columns: minmax(0, 340px) auto;
+  grid-template-areas: "media side" "caption caption";
+  gap: 12px;
+  width: 100%;
+  max-width: 420px;
+}
+.shorts-media { grid-area: media; }
+.shorts-video,
+.shorts-poster {
+  display: block;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  border-radius: var(--radius);
+  background: var(--video-bg);
+  object-fit: cover;
+}
+.shorts-poster { position: relative; overflow: hidden; }
+.shorts-poster img { width: 100%; height: 100%; object-fit: cover; opacity: 0.45; }
+.shorts-note {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--on-scrim);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.shorts-side {
+  grid-area: side;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-self: end;
+}
+.shorts-caption { grid-area: caption; }
+.shorts-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: 1.1rem;
+  line-height: 1.3;
+  color: var(--fg);
+}
+.shorts-meta {
+  margin-top: 4px;
+  font-size: 0.68rem;
+  color: var(--muted);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
 /* Mobile */
 @media (max-width: 720px) {
   .cards.grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

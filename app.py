@@ -42,6 +42,20 @@ FEED_POLL = int(os.environ.get("RECLIP_FEED_POLL", 300))
 FEED_TTL = int(os.environ.get("RECLIP_FEED_TTL", 6 * 3600))
 FEED_COOLDOWN = int(os.environ.get("RECLIP_FEED_COOLDOWN", 600))
 FEED_CHANNELS_MAX = int(os.environ.get("RECLIP_FEED_CHANNELS_MAX", 30))
+# Both off unless asked for: they are the only parts of the app that talk to
+# YouTube on their own, and an instance that only downloads what it is given
+# should not be doing that in the background.
+def enabled(name):
+    return os.environ.get(name, "0") not in ("0", "false", "no", "")
+
+
+FEED_ENABLED = enabled("RECLIP_FEED")
+# Shorts come from the channels followed on the feed page, so there is nothing
+# to show without it.
+SHORTS_ENABLED = FEED_ENABLED and enabled("RECLIP_SHORTS")
+# A short is downloaded when it is watched and needed only for that. An hour
+# outlives a session and nothing more.
+SHORTS_RETENTION = int(os.environ.get("RECLIP_SHORTS_RETENTION", 3600))
 # A pin does not exempt a file, it moves its deadline within a limit the admin
 # still owns. Otherwise the disk stops being bounded.
 PIN_RETENTION = int(os.environ.get("RECLIP_PIN_RETENTION", 30 * 24 * 3600))
@@ -160,6 +174,13 @@ MIGRATIONS = [
     """
     ALTER TABLE entries ADD COLUMN variant TEXT;
     """,
+    """
+    ALTER TABLE channels ADD COLUMN shorts TEXT NOT NULL DEFAULT '[]';
+    ALTER TABLE channels ADD COLUMN shorts_refreshed_at REAL NOT NULL DEFAULT 0;
+    """,
+    """
+    ALTER TABLE entries ADD COLUMN kind TEXT NOT NULL DEFAULT 'video';
+    """,
 ]
 
 
@@ -271,6 +292,10 @@ def update_entry(job_id, **fields):
 
 
 def retention_for(row):
+    """A short is watched once, in the minutes after it is fetched, and never
+    pinned: it has its own, much shorter deadline."""
+    if row["kind"] == "short":
+        return SHORTS_RETENTION
     return PIN_RETENTION if row["pinned"] else RETENTION
 
 
@@ -302,6 +327,7 @@ def entry_json(row):
         "status": row["status"],
         "error": row["error"],
         "pinned": bool(row["pinned"]),
+        "kind": row["kind"],
         "has_file": bool(row["path"]) and os.path.exists(row["path"]),
         "expires_in": seconds_left(row),
     }
@@ -368,8 +394,9 @@ def sweep_downloads():
         # by path and the most generous reference wins: nobody's pin may be
         # undone by somebody else's expiry.
         deadlines = {}
-        for row in conn.execute("SELECT path, pinned FROM entries WHERE path IS NOT NULL"):
-            ttl = PIN_RETENTION if row["pinned"] else RETENTION
+        for row in conn.execute(
+                "SELECT path, pinned, kind FROM entries WHERE path IS NOT NULL"):
+            ttl = retention_for(row)
             deadlines[row["path"]] = max(deadlines.get(row["path"], 0), ttl)
         # A download in flight has no path yet, and is recognised by its name.
         running = {r["job_id"] for r in
@@ -395,42 +422,58 @@ def trim_history():
     """Keep the newest HISTORY_MAX entries per user.
 
     A row is a few bytes, but without a ceiling the list grows for the life of
-    the instance. Pinned entries are never trimmed: pinning says keep it.
+    the instance. Pinned entries are never trimmed: pinning says keep it. Shorts
+    are counted apart, so watching a hundred of them cannot push a download out
+    of somebody's history.
     """
     with connect() as conn:
         stale = conn.execute(
             "SELECT job_id, path FROM entries WHERE pinned = 0 AND job_id NOT IN ("
             "  SELECT job_id FROM ("
             "    SELECT job_id, row_number() OVER ("
-            "      PARTITION BY owner ORDER BY created_at DESC) AS rank FROM entries"
+            "      PARTITION BY owner, kind ORDER BY created_at DESC) AS rank FROM entries"
             "  ) WHERE rank <= ?)", (HISTORY_MAX,)).fetchall()
         for row in stale:
             drop_file(row["path"], keeping=row["job_id"])
             conn.execute("DELETE FROM entries WHERE job_id = ?", (row["job_id"],))
 
 
-def stalest_channel():
-    """The oldest channel somebody still follows."""
+def stalest_slot():
+    """The oldest tab somebody still follows, videos and shorts in one queue.
+
+    A channel holds two slots when shorts are on. Putting them in the same queue
+    is what keeps the outbound rate at one lookup per FEED_POLL whatever is
+    enabled: turning shorts on halves how often each tab comes round, it does
+    not double how often YouTube is asked.
+    """
+    cutoff = time.time() - FEED_TTL
+    queue = ["SELECT c.channel_id, c.channel_url, 'videos' AS tab, c.refreshed_at AS age "
+             "FROM channels c JOIN follows f ON f.channel_id = c.channel_id"]
+    if SHORTS_ENABLED:
+        queue.append("SELECT c.channel_id, c.channel_url, 'shorts', c.shorts_refreshed_at "
+                     "FROM channels c JOIN follows f ON f.channel_id = c.channel_id")
     with connect() as conn:
         return conn.execute(
-            "SELECT c.channel_id, c.channel_url FROM channels c "
-            "JOIN follows f ON f.channel_id = c.channel_id "
-            "WHERE c.refreshed_at < ? ORDER BY c.refreshed_at LIMIT 1",
-            (time.time() - FEED_TTL,)).fetchone()
+            f"SELECT * FROM ({' UNION ALL '.join(queue)}) WHERE age < ? "
+            "ORDER BY age LIMIT 1", (cutoff,)).fetchone()
 
 
 def feed_poller():
-    """One channel per tick, oldest first, for the whole instance.
+    """One tab per tick, oldest first, for the whole instance.
 
     This is the whole automatic refresh: no burst when someone opens the page,
     and a ceiling on outbound lookups that does not move with the number of
-    users or channels.
+    users, channels or pages enabled.
     """
     while True:
         time.sleep(FEED_POLL)
         try:
-            row = stalest_channel()
-            if row:
+            row = stalest_slot()
+            if not row:
+                continue
+            if row["tab"] == "shorts":
+                refresh_shorts(row["channel_url"], row["channel_id"])
+            else:
                 refresh_channel(row["channel_url"], row["channel_id"])
         except Exception as e:
             app.logger.warning("feed refresh failed: %s", e)
@@ -543,12 +586,12 @@ def save_settings(owner, videos, quality):
     return {"videos": videos, "quality": quality}
 
 
-def youtube_videos_url(url):
-    """Turn any supported channel URL into its Videos tab.
+def youtube_tab_url(url, tab="videos"):
+    """Turn any supported channel URL into one of its tabs.
 
     A channel home page is itself a playlist of tabs (Videos, Shorts, Live),
-    which is what yt-dlp returns when asked for it directly. The Videos tab is
-    the chronological feed we want instead.
+    which is what yt-dlp returns when asked for it directly. A tab is the
+    chronological list we want instead.
     """
     parsed = urlparse(url)
     host = parsed.hostname or ""
@@ -563,8 +606,12 @@ def youtube_videos_url(url):
         parts.pop()
     if not parts:
         return None
-    return urlunparse(parsed._replace(path="/" + "/".join(parts + ["videos"]),
+    return urlunparse(parsed._replace(path="/" + "/".join(parts + [tab]),
                                       query="", fragment=""))
+
+
+def youtube_videos_url(url):
+    return youtube_tab_url(url, "videos")
 
 
 def parse_ytdlp_lines(stdout):
@@ -659,6 +706,54 @@ def fetch_channel(url, known=None, count=None):
     }
 
 
+def fetch_shorts(url, count):
+    """List a channel's shorts, and resolve none of them.
+
+    The listing gives an id, a title and a thumbnail, but no date. For videos
+    that is what resolve_videos goes and fetch one by one from the player API,
+    the endpoint that answers "not a bot". Shorts do without: the tab is already
+    newest first, so the channel's own order replaces a date, and the page never
+    touches that endpoint for anything nobody has watched.
+    """
+    shorts_url = youtube_tab_url(url, "shorts")
+    if not shorts_url:
+        raise ValueError("Please enter a YouTube channel URL")
+    cmd = [*YTDLP, "--flat-playlist", "--playlist-end", str(count), "-J", "--", shorts_url]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    # A channel with no Shorts tab is not a failure, it simply has none.
+    if result.returncode != 0:
+        return []
+    info = json.loads(result.stdout)
+    shorts = []
+    for entry in info.get("entries") or []:
+        short_id = entry.get("id")
+        if not short_id:
+            continue
+        shorts.append({
+            "id": short_id,
+            "url": entry.get("webpage_url") or entry.get("url")
+            or f"https://www.youtube.com/shorts/{short_id}",
+            "title": entry.get("title") or "Untitled",
+            "thumbnail": entry.get("thumbnail")
+            or f"https://i.ytimg.com/vi/{short_id}/hqdefault.jpg",
+        })
+    return shorts
+
+
+def refresh_shorts(url, channel_id):
+    """One channel's shorts, under the same lock and the same clock as a feed
+    refresh: the two tabs share one outbound budget."""
+    global last_channel_call
+    with feed_lock:
+        last_channel_call = time.time()
+        shorts = fetch_shorts(url, FEED_VIDEOS_MAX)
+    with connect() as conn:
+        conn.execute("UPDATE channels SET shorts = ?, shorts_refreshed_at = ? "
+                     "WHERE channel_id = ?",
+                     (json.dumps(shorts), time.time(), channel_id))
+    return shorts
+
+
 def refresh_channel(url, channel_id=None):
     """Look a channel up once, for everyone who follows it.
 
@@ -696,7 +791,19 @@ def page_context():
     """What the header needs. Rendered server-side: the identity is known here,
     so asking for it from the browser only bought a flash of empty header."""
     return {"auth": AUTH_MODE, "user": current_user(),
-            "admin": is_admin(), "logout_url": LOGOUT_URL}
+            "admin": is_admin(), "logout_url": LOGOUT_URL,
+            "feed": FEED_ENABLED, "shorts": SHORTS_ENABLED}
+
+
+@app.before_request
+def gate_optional_pages():
+    """One gate rather than a check on each route, so a route added later
+    cannot forget to close behind itself."""
+    path = request.path
+    if not FEED_ENABLED and (path == "/feed" or path.startswith("/api/feed")):
+        abort(404)
+    if not SHORTS_ENABLED and (path == "/shorts" or path.startswith("/api/shorts")):
+        abort(404)
 
 
 @app.route("/")
@@ -743,6 +850,47 @@ def feed():
                     "settings": settings,
                     "limits": {"videos_max": FEED_VIDEOS_MAX,
                                "qualities": FEED_QUALITIES}})
+
+
+@app.route("/shorts")
+def shorts_page():
+    return render_template("shorts.html", page="shorts", **page_context())
+
+
+@app.route("/api/shorts")
+def shorts_list():
+    """Every followed channel's shorts, one from each in turn.
+
+    A round is one short per channel, so no channel takes the top of the page,
+    and it costs no date: the shorts tab is already newest first, and dating
+    them would mean asking the player API about every one of them.
+    """
+    owner = current_user()
+    settings = get_settings(owner)
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT c.title, c.shorts FROM channels c "
+            "JOIN follows f ON f.channel_id = c.channel_id "
+            "WHERE f.owner = ? ORDER BY c.title COLLATE NOCASE", (owner,)).fetchall()
+
+    variant = variant_of("video", None, settings["quality"])
+    with connect() as conn:
+        ready = {r["url"]: r["job_id"] for r in conn.execute(
+            "SELECT url, job_id, path FROM entries WHERE variant = ? AND status = 'done' "
+            "AND path IS NOT NULL", (variant,)) if os.path.exists(r["path"])}
+
+    lists = []
+    for row in rows:
+        shorts = json.loads(row["shorts"])[:settings["videos"]]
+        lists.append([{**short, "uploader": row["title"],
+                       "job_id": ready.get(short["url"])} for short in shorts])
+
+    interleaved = []
+    for rank in range(max((len(one) for one in lists), default=0)):
+        for one in lists:
+            if rank < len(one):
+                interleaved.append(one[rank])
+    return jsonify({"shorts": interleaved, "quality": settings["quality"]})
 
 
 @app.route("/api/feed/settings", methods=["POST"])
@@ -903,7 +1051,11 @@ def admin_overview():
 
     on_disk = [p for p in glob.glob(os.path.join(DOWNLOAD_DIR, "*"))]
     with connect() as conn:
-        rows = conn.execute("SELECT * FROM entries ORDER BY created_at DESC").fetchall()
+        rows = conn.execute("SELECT * FROM entries WHERE kind = 'video' "
+                            "ORDER BY created_at DESC").fetchall()
+        # Shorts are listed as one line, not one row each: a hundred of them
+        # would bury the entries somebody actually asked for.
+        shorts = conn.execute("SELECT path FROM entries WHERE kind = 'short'").fetchall()
 
     users = {}
     entries = []
@@ -920,6 +1072,10 @@ def admin_overview():
     return jsonify({
         "retention": RETENTION,
         "auth": AUTH_MODE,
+        "shorts": {"entries": len(shorts),
+                   "bytes": sum(file_size(r["path"]) for r in shorts if r["path"]),
+                   "retention": SHORTS_RETENTION,
+                   "enabled": SHORTS_ENABLED},
         # Counted from the directory rather than from the rows, so a file no row
         # claims still shows up in the total.
         "disk": {
@@ -958,6 +1114,22 @@ def admin_purge():
                     "running": len(running)})
 
 
+@app.route("/api/admin/shorts", methods=["DELETE"])
+def admin_clear_shorts():
+    """Drop every watched short, whoever watched it.
+
+    They are disposable by design, so this is the sweep done early rather than a
+    decision: nothing here is anybody's library.
+    """
+    require_admin()
+    with connect() as conn:
+        rows = conn.execute("SELECT job_id, path FROM entries WHERE kind = 'short'").fetchall()
+        for row in rows:
+            drop_file(row["path"], keeping=row["job_id"])
+        conn.execute("DELETE FROM entries WHERE kind = 'short'")
+    return jsonify({"entries": len(rows)})
+
+
 @app.route("/api/admin/entries/<job_id>", methods=["DELETE"])
 def admin_delete_entry(job_id):
     require_admin()
@@ -975,8 +1147,8 @@ def list_entries():
     owner = current_user()
     with connect() as conn:
         rows = conn.execute(
-            "SELECT * FROM entries WHERE owner = ? ORDER BY created_at", (owner,)
-        ).fetchall()
+            "SELECT * FROM entries WHERE owner = ? AND kind = 'video' "
+            "ORDER BY created_at", (owner,)).fetchall()
     return jsonify({"entries": [entry_json(r) for r in rows], "user": owner})
 
 
@@ -1155,6 +1327,9 @@ def start_download():
     format_id = data.get("format_id")
     title = data.get("title", "")
     retry_of = data.get("job_id")
+    # A short is an entry like any other, but it stays out of the downloads
+    # list: a page of them would bury what someone actually asked for.
+    kind = "short" if data.get("kind") == "short" else "video"
     try:
         max_height = int(data.get("max_height") or 0) or None
     except (TypeError, ValueError):
@@ -1177,11 +1352,11 @@ def start_download():
         with connect() as conn:
             conn.execute(
                 "INSERT INTO entries (job_id, owner, url, title, thumbnail, uploader,"
-                " upload_date, description, format, format_id, status, created_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " upload_date, description, format, format_id, kind, status, created_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (job_id, owner, url, title, data.get("thumbnail", ""),
                  data.get("uploader", ""), data.get("upload_date", ""),
-                 data.get("description", ""), format_choice, format_id,
+                 data.get("description", ""), format_choice, format_id, kind,
                  "downloading", time.time()))
 
     variant = variant_of(format_choice, format_id, max_height)
@@ -1237,8 +1412,10 @@ def download_file(job_id):
 
 
 # Started last: the poller reaches for everything below it, and a thread that
-# outruns its own module is a bug waiting for a slow import.
-threading.Thread(target=feed_poller, daemon=True).start()
+# outruns its own module is a bug waiting for a slow import. Not started at all
+# when the feed is off: nothing must talk to YouTube on its own then.
+if FEED_ENABLED:
+    threading.Thread(target=feed_poller, daemon=True).start()
 
 
 if __name__ == "__main__":

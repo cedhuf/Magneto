@@ -65,6 +65,22 @@
         tile('Retention', fmtSpan(d.retention), d.auth === 'proxy' ? 'proxy auth' : 'single user'),
       ].join('');
 
+      // One line for every short of every user: they are disposable, and one
+      // row each would bury the entries somebody actually asked for.
+      const shortsRow = d.shorts.enabled || d.shorts.entries
+        ? `<tr class="admin-shorts">
+            <td class="col-owner">everyone</td>
+            <td class="col-title">Shorts watched</td>
+            <td>${d.shorts.entries} kept ${fmtSpan(d.shorts.retention)}</td>
+            <td class="num">${d.shorts.bytes ? esc(fmtSize(d.shorts.bytes)) : '—'}</td>
+            <td class="num">—</td><td class="num">—</td>
+            <td>${d.shorts.entries
+              ? `<button class="row-btn del-btn" data-confirm="Confirm"
+                  onclick="if (armDelete(this)) { clearShorts() }">Purge</button>`
+              : ''}</td>
+          </tr>`
+        : '';
+
       const rows = d.entries.map(e => `
         <tr>
           <td class="col-owner">${esc(e.owner)}</td>
@@ -81,7 +97,7 @@
           <th>User</th><th>Title</th><th>Status</th>
           <th class="num">Size</th><th class="num">Age</th><th class="num">Left</th><th></th>
         </tr></thead>
-        <tbody>${rows || '<tr><td colspan="7">Nothing yet.</td></tr>'}</tbody>`;
+        <tbody>${shortsRow}${rows || (shortsRow ? '' : '<tr><td colspan="7">Nothing yet.</td></tr>')}</tbody>`;
     }
 
     async function purgeAll() {
@@ -97,6 +113,11 @@
         ? `${d.entries} entries and ${d.files} files gone, ${fmtSize(d.bytes) || '0 MB'} freed`
           + (d.running ? `, ${d.running} still downloading` : '')
         : 'Could not delete.';
+    }
+
+    async function clearShorts() {
+      await fetch('/api/admin/shorts', {method: 'DELETE'});
+      load();
     }
 
     async function removeEntry(jobId) {

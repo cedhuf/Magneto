@@ -61,6 +61,22 @@ the channel you know has a new video, not a loop over all of them.
 Playing a feed video downloads it first, then plays the instance's own file.
 Nothing is embedded from YouTube.
 
+### Shorts
+
+**Shorts** shows the shorts of the same channels, one at a time, in the shape
+they were filmed in. Down and up, or `j` and `k`, move between them, space
+pauses. There is nothing to save: a short is fetched when you reach it, one more
+is fetched while you watch, and both are gone after `RECLIP_SHORTS_RETENTION`.
+They stay out of the downloads list and out of the history ceiling, and `/admin`
+shows them as one line with a purge of their own.
+
+The shorts tab of a channel is a second listing, so a channel takes two places
+in the refresh queue instead of one. The outbound rate is unchanged, one lookup
+per `RECLIP_FEED_POLL` whatever is enabled; what changes is that each tab comes
+round half as often. Unlike the feed, shorts are never resolved one by one: the
+tab is already newest first, so the page keeps that order rather than asking
+YouTube about every short to date it.
+
 ### Staying welcome at YouTube
 
 Every subscription of every user leaves from one IP, so the limits are
@@ -141,6 +157,9 @@ date rather than stored.
 | `RECLIP_RETENTION` | `86400` | Seconds a downloaded file is kept, counted from the file's date. Its entry stays afterwards |
 | `RECLIP_DOWNLOAD_TIMEOUT` | `1200` | Seconds a single download may take before it is killed |
 | `RECLIP_PLAYLIST_MAX` | `50` | Most videos one pasted playlist may expand to |
+| `RECLIP_FEED` | `0` | The feed page, and with it the only thread that asks YouTube anything on its own. Off unless asked for |
+| `RECLIP_SHORTS` | `0` | The shorts page. Shorts come from the channels followed on the feed, so this does nothing while `RECLIP_FEED` is off |
+| `RECLIP_SHORTS_RETENTION` | `3600` | Seconds a watched short is kept. It is fetched to be watched once, so it does not need the deadline a download gets, and it is never pinned |
 | `RECLIP_FEED_VIDEOS` | `5` | Ceiling for the per-user feed setting, not the setting itself |
 | `RECLIP_FEED_POLL` | `300` | Seconds between two channel lookups, for the whole instance |
 | `RECLIP_FEED_TTL` | `21600` | Age at which a cached channel is worth looking up again |
