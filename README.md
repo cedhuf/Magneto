@@ -104,7 +104,8 @@ feed off.
 
 Accounts are followed on the **Following** page, alongside the YouTube channels.
 
-Each platform has its own queue, its own clock and its own ceiling. YouTube
+Each platform has its own queue, its own clock and its own ceiling, with its own
+value for that ceiling. YouTube
 cannot see what TikTok was asked, so making them share one budget had each
 paying for the other's curiosity while protecting neither. A third platform
 would get its own the same way.
@@ -297,7 +298,8 @@ date rather than stored.
 | `RECLIP_FEED_POLL` | `300` | Seconds between two lookups of one platform. Each platform keeps its own clock, its own lock and its own queue: spacing exists to avoid being refused by a provider, and a provider only sees its own traffic |
 | `RECLIP_FEED_TTL` | `21600` | Age at which a cached channel is worth looking up again |
 | `RECLIP_FEED_COOLDOWN` | `600` | Minimum age before a manual refresh does anything |
-| `RECLIP_FEED_CHANNELS_MAX` | `30` | Channels one account may follow, **per platform**: following TikTok accounts does not cost YouTube channels |
+| `RECLIP_FEED_CHANNELS_MAX` | `30` | YouTube channels one account may follow |
+| `RECLIP_TIKTOK_ACCOUNTS_MAX` | `30` | TikTok accounts one account may follow. Its own number, not a share of the one above: 300 YouTube channels are not the same cost nor the same risk as 150 of each |
 | `RECLIP_PIN_RETENTION` | `2592000` | Seconds a pinned file is kept. A pin moves the deadline, it does not lift it, so the disk stays bounded |
 | `RECLIP_HISTORY_MAX` | `200` | Entries kept per user. Older ones are dropped, pinned ones never |
 | `RECLIP_DB` | `data/reclip.db` | SQLite file. Put it on the same volume as the downloads, not inside the downloads directory |

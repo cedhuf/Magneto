@@ -43,7 +43,14 @@ FEED_QUALITIES = [360, 480, 720, 1080, 1440]
 FEED_POLL = int(os.environ.get("RECLIP_FEED_POLL", 300))
 FEED_TTL = int(os.environ.get("RECLIP_FEED_TTL", 6 * 3600))
 FEED_COOLDOWN = int(os.environ.get("RECLIP_FEED_COOLDOWN", 600))
-FEED_CHANNELS_MAX = int(os.environ.get("RECLIP_FEED_CHANNELS_MAX", 30))
+# One ceiling per platform, not one for the lot: what a ceiling protects is one
+# provider's patience, and following 300 YouTube channels is not the same cost
+# nor the same risk as following 150 of each. A platform added later gets its
+# own entry rather than a share of somebody else's.
+CHANNELS_MAX = {
+    "youtube": int(os.environ.get("RECLIP_FEED_CHANNELS_MAX", 30)),
+    "tiktok": int(os.environ.get("RECLIP_TIKTOK_ACCOUNTS_MAX", 30)),
+}
 # Both off unless asked for: they are the only parts of the app that talk to
 # YouTube on their own, and an instance that only downloads what it is given
 # should not be doing that in the background.
@@ -630,15 +637,21 @@ def run_download(job_id, url, format_choice, format_id, title, max_height=None,
         # video up, so it has no ids to choose from. A short is filmed upright,
         # where "720p" names the width: bounding its height would ask for a
         # 405x720 copy of a 720x1280 video, or for nothing at all.
-        # A progressive file comes before merging with whatever audio is left:
-        # YouTube's is H.264 and AAC by construction, where that last merge can
-        # put Opus in an mp4, which an iPhone plays without any sound at all.
+        # Two codecs decide whether a file plays at all, and the ladder answers
+        # both before it answers anything else. H.264 first, because HEVC is
+        # decoded by Apple and almost nobody else: TikTok serves it, and Firefox
+        # gives it sound and a black picture. Then a progressive file before
+        # merging with whatever audio is left, because that merge can put Opus
+        # in an mp4, which an iPhone plays without any sound at all.
         side = "width" if vertical else "height"
-        cmd += ["-f", f"bestvideo[{side}<={max_height}][vcodec^=avc1]+bestaudio[ext=m4a]/"
-                      f"bestvideo[{side}<={max_height}]+bestaudio[ext=m4a]/"
-                      f"best[{side}<={max_height}][vcodec^=avc1]/"
-                      f"best[{side}<={max_height}]/"
-                      f"bestvideo[{side}<={max_height}]+bestaudio/best",
+        size = f"[{side}<={max_height}]"
+        wide = "[vcodec!*=hev][vcodec!*=hvc][vcodec!*=265]"
+        cmd += ["-f", f"bestvideo{size}[vcodec^=avc1]+bestaudio[ext=m4a]/"
+                      f"best{size}[vcodec^=avc1]/"
+                      f"bestvideo{size}{wide}+bestaudio[ext=m4a]/"
+                      f"best{size}{wide}/"
+                      f"bestvideo{size}+bestaudio/"
+                      f"best{size}/best",
                 "--merge-output-format", "mp4"]
     else:
         cmd += ["-f", "bestvideo+bestaudio/best", "--merge-output-format", "mp4"]
@@ -1233,7 +1246,7 @@ def provider_state(owner, provider):
             "platform": platform,
             "items": [{"channel_id": r["channel_id"], "title": r["title"],
                        "fetched": r[listed], "failed": not r[seen_tab]} for r in rows],
-            "followed": len(rows), "limit": FEED_CHANNELS_MAX,
+            "followed": len(rows), "limit": CHANNELS_MAX[platform],
             "slots": slots, "round": slots * FEED_POLL,
             "never": sum(1 for r in rows if not r[listed] and r[seen_tab])}
 
@@ -1297,8 +1310,9 @@ def followed_count(owner, platform):
 
 def follow(owner, url, fetch, platform):
     """Record who someone follows, whatever page they follow it from."""
-    if followed_count(owner, platform) >= FEED_CHANNELS_MAX:
-        return jsonify({"error": f"At most {FEED_CHANNELS_MAX} {platform} accounts"}), 400
+    if followed_count(owner, platform) >= CHANNELS_MAX[platform]:
+        return jsonify(
+            {"error": f"At most {CHANNELS_MAX[platform]} {platform} accounts"}), 400
     try:
         channel = fetch(url)
     except subprocess.TimeoutExpired:
@@ -1383,7 +1397,7 @@ def import_subscriptions():
         if channel_id in followed:
             already += 1
             continue
-        if held >= FEED_CHANNELS_MAX:
+        if held >= CHANNELS_MAX["youtube"]:
             full = True
             break
         with connect() as conn:
@@ -1403,7 +1417,7 @@ def import_subscriptions():
     if not (added or already or skipped):
         return jsonify({"error": "No channels found in this file"}), 400
     return jsonify({"added": added, "already": already, "skipped": skipped,
-                    "full": full, "limit": FEED_CHANNELS_MAX,
+                    "full": full, "limit": CHANNELS_MAX["youtube"],
                     "every": FEED_POLL})
 
 
@@ -1437,7 +1451,7 @@ def import_tiktok():
         if channel_id in followed:
             already += 1
             continue
-        if held >= FEED_CHANNELS_MAX:
+        if held >= CHANNELS_MAX["tiktok"]:
             full = True
             break
         with connect() as conn:
@@ -1457,7 +1471,8 @@ def import_tiktok():
     if not (added or already or skipped):
         return jsonify({"error": "No accounts found in this file"}), 400
     return jsonify({"added": added, "already": already, "skipped": skipped,
-                    "full": full, "limit": FEED_CHANNELS_MAX, "every": FEED_POLL})
+                    "full": full, "limit": CHANNELS_MAX["tiktok"],
+                    "every": FEED_POLL})
 
 
 @app.route("/api/feed/refresh", methods=["POST"])
