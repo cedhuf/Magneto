@@ -1,0 +1,534 @@
+/* A downloaded entry, in its two shapes, and the player it opens. The home
+   page and the feed are lists of these and nothing else. */
+
+/* Cards */
+.cards { margin-top: 24px; }
+
+/* Rows by default. The grid modifier reuses the stacked shape the small-screen
+   rules already define, rather than describing a second card. */
+/* 200 rather than 230: the page is 952px wide inside its padding, where a 230
+   minimum works out at 3.98 tracks and so lays out three. Four fit. */
+.cards.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.cards.grid .card { flex-direction: column; min-height: 0; margin-bottom: 0; }
+
+.cards.grid .card-thumb {
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 16 / 9;
+  align-self: auto;
+}
+
+.cards.grid .card-body { padding: 12px 14px 0; }
+
+.cards.grid .card-title {
+  /* Two lines, always: reserving the room is what keeps every tile the same
+     height whatever the title says. */
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  min-height: calc(2 * 1.3em);
+  overflow: hidden;
+}
+
+.cards.grid .card { height: 100%; }
+
+/* A tile is already a column, so the block lies down along its foot: the action
+   takes the room it can, the icons keep their own. */
+.cards.grid .card-side {
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: stretch;
+  margin: 10px 12px 12px;
+}
+
+/* Laid down, the icons must not be squeezed by the action taking all it can,
+   nor pushed out of a block that hides what overflows it.
+
+   Sized by width and not by flex-basis, which is the whole point: measuring a
+   nested flex container, engines ask its children for their content width and
+   ignore the basis they were given (flexbugs #223, Mozilla 1179454). This row
+   was measured at 31px, the width of two icons and no buttons, so the action
+   took the rest and the delete fell outside a block that hides what overflows.
+   A width is read by that measurement; a basis is not. */
+.cards.grid .card-icons {
+  flex: 0 0 auto;
+  border-top: none;
+  border-left: 1.5px solid var(--card-border);
+}
+
+.cards.grid .card-icons .icon-btn { flex: none; width: 42px; }
+
+.cards.grid .card-side .card-dl-btn {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
+.thumb-badge.start { right: auto; left: 5px; }
+
+.history .cards { margin-top: 14px; }
+
+/* One row height for every card, so the thumbnails keep the same shape all the
+   way down the list. min-height rather than height: an error message is allowed
+   to make its own card taller instead of being cut. */
+.card {
+  display: flex;
+  align-items: stretch;
+  min-height: 96px;
+  border: 1.5px solid var(--card-border);
+  border-radius: var(--radius);
+  background: var(--card);
+  overflow: hidden;
+  margin-bottom: 10px;
+  transition: border-color 0.16s ease, transform 0.16s ease;
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card:hover { border-color: var(--muted); }
+
+.card.expanded { align-items: flex-start; }
+
+.card.expanded .card-thumb { height: 96px; align-self: auto; }
+
+/* Flush to the card's left, top and bottom edges: the card's own radius and
+   overflow do the rounding, the image has none of its own. */
+.card-thumb {
+  width: 170px;
+  min-width: 170px;
+  align-self: stretch;
+  background: var(--card-border);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.card-thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* No-thumbnail icon */
+.card-thumb .no-thumb {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+
+.card-thumb .no-thumb svg {
+  width: 28px;
+  height: 28px;
+  opacity: 0.5;
+}
+
+/* Play badge on the thumbnail */
+.thumb-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: var(--scrim);
+  color: var(--on-scrim);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.card-thumb:hover .thumb-play,
+.thumb-play:focus-visible { opacity: 1; }
+
+.thumb-play svg {
+  width: 26px;
+  height: 26px;
+  filter: drop-shadow(0 1px 3px var(--scrim-shadow));
+}
+
+/* No hover on touch, so the badge has to stay visible there. */
+@media (hover: none) {
+  .thumb-play { opacity: 1; background: var(--scrim-soft); }
+}
+
+/* Player overlay */
+/* One modal, shared by the player and the feed sheet. */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--scrim-strong);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modal-box {
+  position: relative;
+  width: 100%;
+  max-width: 880px;
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  border: 1.5px solid var(--card-border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.modal-close {
+  position: absolute;
+  z-index: 1;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: var(--scrim);
+  color: var(--on-scrim);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.modal-close:hover { background: var(--scrim-strong); }
+
+.modal-close svg { width: 16px; height: 16px; }
+
+.modal-media {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--video-bg);
+}
+
+audio.modal-media {
+  aspect-ratio: auto;
+  background: transparent;
+  padding: 20px 20px 0;
+  width: calc(100% - 40px);
+}
+
+.modal-body { padding: 18px 20px 22px; }
+
+.modal-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.modal-meta {
+  margin-top: 6px;
+  font-size: 0.68rem;
+  color: var(--muted);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/* Shimmer skeleton for loading state */
+.card-thumb.loading {
+  background: var(--shimmer);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.skeleton-line {
+  height: 12px;
+  border-radius: 4px;
+  background: var(--shimmer);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  margin-bottom: 6px;
+}
+
+.skeleton-line.short { width: 40%; height: 10px; }
+
+.skeleton-line.medium { width: 75%; }
+
+.card-body {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* The action column has a width of its own, so nothing in the text can push
+   the buttons around, and the buttons line up down the list. */
+/* One block rather than three buttons: a single outline, a single radius, and
+   hairlines between the segments. Fixed width, so the blocks line up down the
+   list whatever the labels say. */
+.card-side {
+  flex: 0 0 128px;
+  margin: 12px 12px 12px 0;
+  display: flex;
+  flex-direction: column;
+  border: 1.5px solid var(--card-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* The segments give up their own frame: the block carries it now. */
+.card-side .card-dl-btn {
+  flex: 1;
+  justify-content: center;
+  border: none;
+  border-radius: 0;
+  padding: 8px 10px;
+}
+
+.card-side .card-status {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  text-align: center;
+}
+
+.card-icons { display: flex; border-top: 1.5px solid var(--card-border); }
+
+.card-icons .icon-btn {
+  flex: 1;
+  width: auto;
+  /* Stretched rather than sized: the segment is as tall as the block's row. */
+  height: auto;
+  min-height: 32px;
+  border: none;
+  border-radius: 0;
+}
+
+.card-icons .icon-btn:hover { background: var(--fg-wash); color: var(--fg); }
+
+.card-icons .icon-btn + .icon-btn { border-left: 1.5px solid var(--card-border); }
+
+.card-note-row { margin-top: 5px; }
+
+.card-desc {
+  margin-top: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: 8px;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.card-note { font-size: 0.68rem; color: var(--muted); }
+
+.card-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+
+/* Badges sit on the thumbnail, out of the text flow entirely, so nothing they
+   say can push the layout around. */
+.thumb-badge {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--scrim-strong);
+  color: var(--on-scrim);
+  font-size: 0.56rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.card-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: 1rem;
+  line-height: 1.3;
+  color: var(--fg);
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-meta {
+  font-size: 0.68rem;
+  color: var(--muted);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.card-dl-btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  padding: 5px 14px;
+  border: 1.5px solid var(--accent);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--accent);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.card-dl-btn:hover { background: var(--accent); color: var(--on-accent); }
+
+.card-dl-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.card-status {
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.card-status.downloading { color: var(--accent); }
+
+.card-status.done { color: var(--success); }
+
+.card-status.error { color: var(--error); }
+
+.q-chip {
+  padding: 3px 9px;
+  border: 1.5px solid var(--card-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.q-chip.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: transparent;
+}
+
+.q-chip:hover:not(.active) { border-color: var(--muted); }
+
+/* Error card */
+.card.card-error {
+  border-color: var(--error-border);
+  background: var(--error-wash);
+}
+
+.card-error-icon {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--error-wash-strong);
+  color: var(--error);
+}
+
+.card-error-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.card-error-msg {
+  font-size: 0.72rem;
+  color: var(--error);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.card-error-url {
+  font-size: 0.65rem;
+  color: var(--muted);
+  word-break: break-all;
+  margin-top: 4px;
+}
+
+.dl-all-btn {
+  flex: 1;
+  padding: 11px;
+  border: 1.5px solid var(--accent);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--accent);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dl-all-btn:hover { background: var(--accent); color: var(--on-accent); }
+
+.dl-all-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Mobile */
+@media (max-width: 720px) {
+  .cards.grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card-thumb { width: 132px; min-width: 132px; }
+  .card-body { padding: 12px; }
+}
+
+@media (max-width: 500px) {
+  .card {
+    flex-direction: column;
+    min-height: 0;
+  }
+  .card-thumb {
+    width: 100%;
+    min-width: 0;
+    height: 180px;
+    align-self: auto;
+  }
+  .card-body { padding: 12px 14px 0; }
+  .card-side {
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: stretch;
+    margin: 10px 14px 14px;
+  }
+  .card-icons {
+    flex: 0 0 auto;
+    border-top: none;
+    border-left: 1.5px solid var(--card-border);
+  }
+  .card-icons .icon-btn { flex: none; width: 46px; }
+  .card-side .card-dl-btn {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-align: center;
+  }
+  .card-title { white-space: normal; }
+  .cards.grid { grid-template-columns: 1fr; }
+  .modal { padding: 12px; }
+}
+
+/* A file already on the server: the badge is the difference between pressing
+   play and waiting for a download. */
+.thumb-badge.ready {
+  background: var(--accent);
+  color: var(--on-accent);
+}

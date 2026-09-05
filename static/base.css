@@ -1,0 +1,591 @@
+/* The design system: the palette, the type, the page, the header and every
+   control the rest of the app is built from. Loaded by every page. */
+
+@font-face {
+  font-family: 'DM Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/static/fonts/dmmono-400-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'DM Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/static/fonts/dmmono-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'DM Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/static/fonts/dmmono-500-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'DM Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/static/fonts/dmmono-500-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/static/fonts/instrumentserif-400-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/static/fonts/instrumentserif-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/static/fonts/instrumentserif-400i-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/static/fonts/instrumentserif-400i-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Light is the base. The dark palette is written twice on purpose: once for the
+   system preference, once for an explicit choice, and CSS offers no way to
+   share one block between a media query and an attribute selector. Keep them
+   in step. */
+:root {
+  color-scheme: light;
+  --bg: #f4f1eb;
+  --fg: #3a3a38;
+  --accent: #e85d2a;
+  --accent-hover: #d04e1f;
+  --muted: #9c9889;
+  --card: #fff;
+  --card-border: #e2ded6;
+  --success: #2d8a4e;
+  --error: #c43d3d;
+  --on-accent: #fff;
+  /* Red stays red in both themes, so this one is defined once. */
+  --on-error: #fff;
+  --btn-hover: #2d2d2a;
+  --accent-ring: rgba(232, 93, 42, 0.08);
+  --fg-wash: rgba(26, 26, 24, 0.04);
+  --error-border: rgba(196, 61, 61, 0.2);
+  --error-wash: rgba(196, 61, 61, 0.03);
+  --error-wash-strong: rgba(196, 61, 61, 0.08);
+  /* Cut into the page: a shadow inside, a lit edge below. */
+  --engrave: inset 0 2px 5px rgba(0, 0, 0, 0.06), 0 1px 0 rgba(255, 255, 255, 0.7);
+  --shimmer-base: #ebe8e2;
+  --shimmer-highlight: #f0ede7;
+  --noise-opacity: 0.03;
+  /* Same in both themes: a scrim over an image, and a video letterbox. */
+  --scrim: rgba(0, 0, 0, 0.32);
+  --scrim-soft: rgba(0, 0, 0, 0.22);
+  --scrim-strong: rgba(0, 0, 0, 0.72);
+  --on-scrim: #fff;
+  --scrim-shadow: rgba(0, 0, 0, 0.5);
+  --video-bg: #000;
+  --radius: 14px;
+  --shimmer: linear-gradient(90deg, var(--shimmer-base) 25%, var(--shimmer-highlight) 50%, var(--shimmer-base) 75%);
+}
+
+/* System preference, unless an explicit choice says otherwise. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #1b1a17;
+    --fg: #ece7dd;
+    --accent: #f2703d;
+    --accent-hover: #ff8756;
+    --muted: #918c7e;
+    --card: #22211c;
+    --card-border: #35332c;
+    --success: #4fae74;
+    --error: #e2696a;
+    --on-accent: #1b1a17;
+    --btn-hover: #ffffff;
+    --accent-ring: rgba(242, 112, 61, 0.18);
+    --fg-wash: rgba(236, 231, 221, 0.07);
+    --error-border: rgba(226, 105, 106, 0.28);
+    --error-wash: rgba(226, 105, 106, 0.06);
+    --error-wash-strong: rgba(226, 105, 106, 0.12);
+    --engrave: inset 0 2px 6px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.04);
+    --shimmer-base: #26241e;
+    --shimmer-highlight: #302d26;
+    --noise-opacity: 0.02;
+  }
+}
+
+/* Explicit choice, which must win in both directions. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1b1a17;
+  --fg: #ece7dd;
+  --accent: #f2703d;
+  --accent-hover: #ff8756;
+  --muted: #918c7e;
+  --card: #22211c;
+  --card-border: #35332c;
+  --success: #4fae74;
+  --error: #e2696a;
+  --on-accent: #1b1a17;
+  --btn-hover: #ffffff;
+  --accent-ring: rgba(242, 112, 61, 0.18);
+  --fg-wash: rgba(236, 231, 221, 0.07);
+  --error-border: rgba(226, 105, 106, 0.28);
+  --error-wash: rgba(226, 105, 106, 0.06);
+  --error-wash-strong: rgba(226, 105, 106, 0.12);
+  --engrave: inset 0 2px 6px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shimmer-base: #26241e;
+  --shimmer-highlight: #302d26;
+  --noise-opacity: 0.02;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* The browser hides [hidden] with display: none, which any author display rule
+   beats. Two panels declared display: flex and could never be hidden again. */
+[hidden] { display: none !important; }
+
+body {
+  font-family: 'DM Mono', monospace;
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  opacity: var(--noise-opacity);
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-size: 128px;
+}
+
+.page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 60px 24px 80px;
+}
+
+/* The actions never drop below the title. When the row runs out of room it is
+   the action block that wraps onto itself, staying in the top right corner. */
+.brand {
+  margin-bottom: 48px;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.brand-text { min-width: 0; }
+
+/* The theme is a setting, not a destination: a rule and a wider gap say so
+   without adding a second visual style. */
+.theme-btn {
+  border: none;
+  background: transparent;
+  font-family: 'DM Mono', monospace;
+  cursor: pointer;
+  padding-left: 14px;
+  margin-left: 2px;
+  border-left: 1px solid var(--card-border);
+  /* Room for the longest of Auto, Light and Dark, so cycling does not shift
+     the row. Monospace, hence ch, plus a margin for the letter-spacing that
+     ch does not account for. */
+  min-width: calc(6ch + 14px);
+  text-align: right;
+}
+
+/* The label comes from the attribute the head script sets before first paint,
+   so it is correct on the first frame instead of appearing a moment later. */
+.theme-btn::after { content: 'Auto'; }
+
+:root[data-theme="light"] .theme-btn::after { content: 'Light'; }
+
+:root[data-theme="dark"] .theme-btn::after { content: 'Dark'; }
+
+.brand h1 {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(2.2rem, 8vw, 4.2rem);
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--fg);
+}
+
+.brand h1 em { font-style: italic; color: var(--accent); }
+
+.brand-link { color: inherit; text-decoration: none; }
+
+.brand p {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+textarea {
+  width: 100%;
+  padding: 18px 20px;
+  border: 1.5px solid var(--card-border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--fg);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.88rem;
+  outline: none;
+  resize: none;
+  min-height: 56px;
+  transition: border-color 0.25s, box-shadow 0.25s;
+  margin-bottom: 6px;
+}
+
+textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+textarea::placeholder { color: var(--muted); }
+
+.hint {
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-bottom: 20px;
+  letter-spacing: 0.02em;
+}
+
+.controls {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 6px;
+  align-items: center;
+}
+
+.pill-group {
+  display: flex;
+  border: 1.5px solid var(--card-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card);
+}
+
+.pill {
+  padding: 9px 18px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.76rem;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.pill.active { background: var(--fg-wash); color: var(--accent); }
+
+.pill:not(.active):hover { color: var(--fg); }
+
+.fetch-btn {
+  flex: 1;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.fetch-btn:hover { background: var(--accent-hover); }
+
+.fetch-btn:active { transform: scale(0.98); }
+
+.fetch-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* Destructive, so it must not wear the colour of the primary action: outlined
+   until the pointer is on it. */
+.fetch-btn.danger {
+  background: var(--error-wash);
+  border: 1.5px solid var(--error-border);
+  color: var(--error);
+}
+
+.fetch-btn.danger:hover { background: var(--error-wash-strong); border-color: var(--error); }
+
+/* Admin */
+.brand-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.text-btn {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-decoration: none;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.text-btn:hover { color: var(--accent); }
+
+/* The page you are on is marked, not removed. */
+.text-btn.active { color: var(--fg); cursor: default; }
+
+.stat {
+  border: 1.5px solid var(--card-border);
+  border-radius: var(--radius);
+  background: var(--card);
+  padding: 16px 18px;
+}
+
+/* Wide tables scroll on their own rather than pushing the page sideways. */
+.table-scroll { overflow-x: auto; }
+
+.row-btn {
+  border: 1.5px solid var(--card-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.64rem;
+  padding: 4px 9px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.row-btn:hover { color: var(--error); border-color: var(--error); }
+
+.history { margin-top: 40px; }
+
+/* A destructive link says it in its colour and its word, not by turning into a
+   red chip: there is no button shape here to fill. */
+.link-btn.del-btn.armed,
+.link-btn.del-btn.armed:hover { background: none; color: var(--error); }
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (hover: none) {
+  .icon-btn { width: 40px; height: 40px; }
+  .icon-btn svg { width: 17px; height: 17px; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Folded by default: a row keeps its height until someone asks for more. */
+.link-btn {
+  margin-left: 8px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-family: 'DM Mono', monospace;
+  font-size: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.link-btn:hover { color: var(--accent-hover); }
+
+.q-size {
+  margin-left: 6px;
+  opacity: 0.6;
+}
+
+.q-more { color: var(--accent); }
+
+/* Download all bar */
+.dl-all-bar {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.spin {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.footer {
+  margin-top: 48px;
+  text-align: center;
+  font-size: 0.68rem;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1.8;
+}
+
+.footer-note {
+  margin-top: 2px;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  opacity: 0.8;
+}
+
+.footer-note a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.footer-note a:hover { border-bottom-color: var(--accent); }
+
+/* Full screen: the page keeps its markup and gives up everything that is not
+   the video. A class rather than the native API alone, because iOS has no
+   element fullscreen and would leave the reel behind. */
+body.full { background: var(--video-bg); }
+
+body.full .page { max-width: none; padding: 0; }
+
+body.full .brand,
+body.full .feed-head,
+body.full .hint { display: none; }
+
+/* Stacked, and the image now touches top, left and right instead of left, top
+   and bottom. Same rule, different neighbours. */
+@media (max-width: 500px) {
+  .page { padding: 40px 16px 60px; }
+  /* The actions stay on the title's line, aligned with its top edge. Only a
+     name long enough to leave no room lets the wrap take over. */
+  .brand { gap: 10px; }
+  .brand-actions { gap: 8px; margin-top: 4px; }
+  .text-btn { font-size: 0.66rem; }
+  .controls { flex-wrap: wrap; }
+  .fetch-btn { width: 100%; }
+}
+
+/* Per-entry actions */
+.icon-btn {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.icon-btn svg { width: 14px; height: 14px; }
+
+.icon-btn:hover { color: var(--fg); border-color: var(--card-border); }
+
+/* The width is set for the longest of the two labels, and the page is
+   border-box, where a min-width would have been eaten by the padding. Only the
+   labelled shape has labels: an icon is square and must stay the size of its
+   neighbours. */
+.del-btn:not(.icon-btn) { box-sizing: content-box; }
+
+/* Armed by a first click: the next one deletes. Red is a state here, not a
+   hover, so it must beat the hover rules of both shapes. */
+.del-btn.armed,
+.del-btn.armed:hover {
+  background: var(--error);
+  border-color: var(--error);
+  color: var(--on-error);
+}
+
+.icon-btn.on { color: var(--accent); }
+
+.icon-btn.danger:hover { color: var(--error); border-color: var(--error-border); }
+
+/* A resolution that will not play on an Apple device is available, not hidden,
+   but it says so. */
+.q-warn {
+  margin-left: 4px;
+  color: var(--error);
+  font-weight: 500;
+}
+
+.figure {
+  padding: 12px 14px;
+  border: 1.5px solid var(--card-border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.history-head {
+  font-size: 0.68rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+/* A list header that also carries its actions, as on the feed. */
+.history-head.with-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Two folded panels, one shell: the settings, and the ways to add a channel.
+   Both are built from the same pills and fields as the rest of the app rather
+   than from a second kind of control. */
+.feed-head-actions { display: flex; flex-wrap: wrap; gap: 14px; }

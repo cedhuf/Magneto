@@ -1,0 +1,149 @@
+/* Following: the bar above a list, the panels, and the rows of accounts with
+   what they cost. Shared by the feed and the Following page. */
+
+/* Feed stays scannable as a compact responsive grid rather than a long
+   succession of full-width download cards. */
+.feed-add { display: flex; gap: 10px; }
+
+.feed-add input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 1.5px solid var(--card-border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--fg);
+  font: 0.82rem 'DM Mono', monospace;
+  outline: none;
+}
+
+.feed-add input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+
+.feed-add .fetch-btn { flex: 0 0 auto; }
+
+.feed-head { display: flex; justify-content: space-between; align-items: center; margin: 32px 0 12px; font-size: 0.68rem; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+
+.subscriptions { margin-top: 40px; }
+
+.channel-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; }
+
+.channel-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 10px 2px; border-bottom: 1px solid var(--card-border); font-size: .74rem; }
+
+.channel-row > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; }
+
+/* Pushed against the buttons and never wrapped: it is a footnote to the name,
+   not a column of its own. */
+.channel-when { flex: 0 0 auto; margin-left: auto; font-size: 0.64rem; color: var(--muted); white-space: nowrap; }
+
+.channel-when.failed { color: var(--error); }
+
+.channel-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+
+.history-head + .hint { margin-top: 10px; }
+
+@media (max-width: 500px) {
+  .feed-add { flex-wrap: wrap; }
+  .feed-add input { width: 100%; flex-basis: 100%; }
+  .feed-add .fetch-btn { width: 100%; }
+  .channel-list { grid-template-columns: 1fr; }
+}
+
+.feed-panel {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--card-border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.feed-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.feed-add-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.feed-import {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.68rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.feed-import input[type="file"] { font: 0.7rem 'DM Mono', monospace; color: var(--muted); }
+
+.feed-import input[type="file"]::file-selector-button {
+  margin-right: 10px;
+  padding: 6px 12px;
+  border: 1.5px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 0.7rem 'DM Mono', monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.feed-import input[type="file"]::file-selector-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.feed-settings label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.68rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.feed-settings .pill { padding: 6px 12px; font-size: 0.7rem; }
+
+/* Following: one block per provider, its cost stated before its list. */
+.follow-block { margin-bottom: 40px; }
+
+.follow-block .feed-head { margin-top: 0; }
+
+.figures {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.figure-label {
+  font-size: 0.6rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.figure-value {
+  margin-top: 6px;
+  font-family: 'Instrument Serif', serif;
+  font-size: 1.15rem;
+  color: var(--fg);
+}
+
+.figure-hint {
+  margin-top: 2px;
+  font-size: 0.58rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 720px) {
+  .figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

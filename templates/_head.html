@@ -16,7 +16,13 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f4f1eb" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1b1a17" media="(prefers-color-scheme: dark)">
-<link rel="stylesheet" href="/static/style.css">
+{# Each page loads the design system plus what it actually draws. Nothing is
+   shared between two of these files, so the order they arrive in cannot change
+   a cascade. #}
+<link rel="stylesheet" href="/static/base.css">
+{% for sheet in styles | default([]) %}
+<link rel="stylesheet" href="/static/{{ sheet }}.css">
+{% endfor %}
 <script>
   // Before first paint, or the page flashes light before the choice applies.
   try {

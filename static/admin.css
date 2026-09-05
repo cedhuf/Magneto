@@ -1,0 +1,75 @@
+/* Admin: the figures at the top and the table under them. */
+
+/* Three by three rather than one squeezed row: six figures side by side are
+   read one after another, in a grid they are read at a glance. */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 720px) {
+ .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 460px) {
+ .stats { grid-template-columns: 1fr; }
+}
+
+/* Shorts sit apart from what people kept: same tile, dashed and unfilled, the
+   way a temporary thing should look next to a permanent one. */
+.stat-shorts {
+  border-style: dashed;
+  background: none;
+}
+
+.stat-shorts .stat-value { color: var(--muted); }
+
+.stat-value {
+  font-family: 'Instrument Serif', serif;
+  font-size: 1.7rem;
+  line-height: 1.1;
+  color: var(--fg);
+}
+
+.stat-label {
+  margin-top: 4px;
+  font-size: 0.66rem;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.stat-hint { margin-top: 2px; font-size: 0.64rem; color: var(--muted); opacity: 0.7; }
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+}
+
+.admin-table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.62rem;
+  padding: 8px 10px;
+}
+
+.admin-table td {
+  padding: 9px 10px;
+  border-top: 1px solid var(--card-border);
+  white-space: nowrap;
+}
+
+.admin-table .num { text-align: right; }
+
+.admin-table .col-owner { color: var(--accent); }
+
+.admin-table .col-title {
+  max-width: 380px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

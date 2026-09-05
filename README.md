@@ -348,6 +348,19 @@ Anything [yt-dlp supports](https://github.com/yt-dlp/yt-dlp/blob/master/supporte
 
 YouTube, TikTok, Instagram, Twitter/X, Reddit, Facebook, Vimeo, Twitch, Dailymotion, SoundCloud, Loom, Streamable, Pinterest, Tumblr, Threads, LinkedIn, and many more.
 
+## Stylesheets
+
+There is no build step, so the CSS is split by what draws what and each page
+links the design system plus the sheets it actually needs: `base.css` everywhere,
+then `cards.css` for the two lists of entries, `follow.css` for the accounts,
+`vertical.css` for the reel, `admin.css` for the figures. No selector appears in
+two of them, so the order they arrive in cannot change a cascade, and a page
+never carries rules for a page it is not.
+
+`shared.css` stands apart: a share link is read from outside the instance, where
+`/static` is behind the sign-in, so that page carries its own small sheet served
+from under `/s`.
+
 ## Stack
 
 - **Backend:** Python + Flask (~150 lines)
