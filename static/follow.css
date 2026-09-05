@@ -21,8 +21,6 @@
 
 .feed-add .fetch-btn { flex: 0 0 auto; }
 
-.feed-head { display: flex; justify-content: space-between; align-items: center; margin: 32px 0 12px; font-size: 0.68rem; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
-
 .subscriptions { margin-top: 40px; }
 
 .channel-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; }

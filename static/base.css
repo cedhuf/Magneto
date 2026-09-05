@@ -499,7 +499,6 @@ body.full { background: var(--video-bg); }
 body.full .page { max-width: none; padding: 0; }
 
 body.full .brand,
-body.full .feed-head,
 body.full .hint { display: none; }
 
 /* Stacked, and the image now touches top, left and right instead of left, top
@@ -588,4 +587,7 @@ body.full .hint { display: none; }
 /* Two folded panels, one shell: the settings, and the ways to add a channel.
    Both are built from the same pills and fields as the rest of the app rather
    than from a second kind of control. */
+/* A line above a list: what it holds on the left, what can be done to it on the
+   right. The home page, the feed and Following all wear it. */
+.feed-head { display: flex; justify-content: space-between; align-items: center; margin: 32px 0 12px; font-size: 0.68rem; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
 .feed-head-actions { display: flex; flex-wrap: wrap; gap: 14px; }
