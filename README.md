@@ -1,4 +1,4 @@
-# ReClip
+# Magneto
 
 A self-hosted video downloader and reader for a household. Paste a link and keep
 the file for a day, or follow channels and accounts and read what they publish
