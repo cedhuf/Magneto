@@ -15,18 +15,21 @@ page. The download side still works the way the original does.
 ## Quick start
 
 ```bash
-brew install yt-dlp ffmpeg    # or apt install ffmpeg && pip install yt-dlp
 git clone <this repository>
-cd reclip
-./magneto.sh
+cd magneto
+docker compose up -d
 ```
 
-Then open http://localhost:8899.
+Then open http://localhost:8899. The compose file builds the image, keeps the
+files and the database in two named volumes, and restarts the container with the
+host. Everything is configured there, so editing it and running `docker compose
+up -d` again is the whole administration.
 
-With Docker:
+To run it without Docker, on a machine that already has yt-dlp and ffmpeg:
 
 ```bash
-docker build -t reclip . && docker run -p 8899:8899 reclip
+brew install yt-dlp ffmpeg    # or apt install ffmpeg && pip install yt-dlp
+./magneto.sh
 ```
 
 Nothing is enabled beyond the downloader. The feed, the shorts page, TikTok and
