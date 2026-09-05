@@ -10,6 +10,8 @@ YouTube channels, a vertical reader for shorts and TikTok, accounts behind a
 forward-auth proxy, public share links, retention with pinning, and an admin
 page. The download side still works the way the original does.
 
+![The home page: paste a link, keep the file for a day](docs/screens/home.png)
+
 ## Quick start
 
 ```bash

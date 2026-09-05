@@ -68,6 +68,14 @@ Firefox gives it sound and a black picture. Then a progressive file before
 merging with whatever audio is left, because that merge can put Opus in an mp4,
 which an iPhone plays without any sound at all.
 
+## Screenshots
+
+`docs/screens` is generated, not collected by hand. A test starts the app on an
+ephemeral port with a throwaway database, seeds a few channels and downloads it
+makes up on the spot, and takes three shots with Playwright. Thumbnails are
+gradients built in the test rather than images fetched from anybody. Rerun it
+after a change that touches those pages and the documentation stops lying.
+
 ## Stack
 
 - Python and Flask, twelve modules, about 2300 lines

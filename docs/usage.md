@@ -13,6 +13,8 @@ needs it, and deleting one entry never takes another's file.
 
 ## Feed
 
+![The feed: followed channels merged into one grid](screens/feed.png)
+
 Feed shows the latest videos of the YouTube channels you follow, merged into one
 grid, newest first. Settings picks the quality and how many videos to keep per
 channel, for the whole feed rather than per video.
@@ -45,6 +47,8 @@ sound one tap away. And a wake lock is held while a clip plays, because a muted
 inline video does not keep a phone awake on its own.
 
 ## Following
+
+![Following: every provider, with what it costs](screens/following.png)
 
 Following is one act with several nouns, so it has one page rather than a panel
 on each reading page. It lists every provider: a field to add one account, the
