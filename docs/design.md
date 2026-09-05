@@ -77,6 +77,10 @@ release, which in turn builds the image and pushes it to `ghcr.io`. The version
 is passed to the build as `MAGNETO_VERSION`, so a running container can say
 which release it is.
 
+The image is built for `linux/amd64` and `linux/arm64`, the second under
+emulation on an x86 runner. That is slow, which is why the build keeps a layer
+cache between releases.
+
 While the major is 0, a `feat` moves the minor and a `fix` moves the patch. The
 first release is 0.1.0 and its changelog covers everything added since the fork.
 
