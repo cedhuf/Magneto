@@ -21,13 +21,13 @@ COPY . .
 ARG MAGNETO_VERSION=unknown
 ENV MAGNETO_VERSION=$MAGNETO_VERSION
 
-RUN useradd -m -u 1000 reclip && \
+RUN useradd -m -u 1000 magneto && \
     mkdir -p /app/downloads /app/data && \
-    chown -R reclip:reclip /app
-USER reclip
+    chown -R magneto:magneto /app
+USER magneto
 
-# Put the reclip user's --user installs first so startup yt-dlp updates take effect.
-ENV PATH=/home/reclip/.local/bin:$PATH
+# Put the magneto user's --user installs first so startup yt-dlp updates take effect.
+ENV PATH=/home/magneto/.local/bin:$PATH
 
 EXPOSE 8899
 

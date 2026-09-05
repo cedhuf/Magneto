@@ -1,13 +1,13 @@
 services:
-  reclip:
+  magneto:
     build: .
-    image: reclip:latest
-    container_name: reclip
+    image: magneto:latest
+    container_name: magneto
     ports:
       - "8899:8899"
     volumes:
-      - reclip-downloads:/app/downloads
-      - reclip-data:/app/data
+      - magneto-downloads:/app/downloads
+      - magneto-data:/app/data
     environment:
       # Personal instance: one implicit user, nothing to log into.
       # Set to "proxy" behind a forward-auth proxy, and bind to localhost then.
@@ -20,5 +20,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  reclip-downloads:
-  reclip-data:
+  magneto-downloads:
+  magneto-data:

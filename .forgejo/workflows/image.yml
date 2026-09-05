@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE: git.thehuf.uk/cedric/reclip
+  IMAGE: git.thehuf.uk/cedric/magneto
 
 jobs:
   build:
