@@ -9,8 +9,10 @@ name: Container image
 on:
   workflow_dispatch:
 
+# The forge is not named here: it comes from the run, so this file carries no
+# hostname and works on whichever instance runs it.
 env:
-  IMAGE: git.thehuf.uk/cedric/magneto
+  FORGE: ${{ github.server_url }}
 
 jobs:
   build:
@@ -21,20 +23,24 @@ jobs:
           set -eu
           find . -mindepth 1 -delete
           git clone --depth 1 --branch "$GITHUB_REF_NAME" \
-            "https://x-access-token:${{ github.token }}@git.thehuf.uk/$GITHUB_REPOSITORY.git" .
+            "${FORGE%%://*}://x-access-token:${{ github.token }}@${FORGE#*://}/$GITHUB_REPOSITORY.git" .
 
       - name: Build
         run: |
           set -eu
           SHA=$(git rev-parse --short HEAD)
           echo "SHA=$SHA" >> "$GITHUB_ENV"
+          REGISTRY=${FORGE#*://}
+          IMAGE=$REGISTRY/$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
+          echo "REGISTRY=$REGISTRY" >> "$GITHUB_ENV"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
           TAGS="-t $IMAGE:$SHA -t $IMAGE:latest"
           case "$GITHUB_REF" in
             refs/tags/*) TAGS="$TAGS -t $IMAGE:$GITHUB_REF_NAME" ;;
           esac
           # The source label is what makes Forgejo attach the package to the repo.
           podman build \
-            --label "org.opencontainers.image.source=https://git.thehuf.uk/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.source=$FORGE/$GITHUB_REPOSITORY" \
             --label "org.opencontainers.image.revision=$SHA" \
             --build-arg "MAGNETO_VERSION=$SHA" \
             $TAGS .
@@ -46,10 +52,10 @@ jobs:
           # enough: its login succeeds, then the blob upload is refused with
           # "authentication required" (forgejo#1296, still true in 15.0.7).
           printf '%s' '${{ secrets.REGISTRY_TOKEN }}' \
-            | podman login --username "$GITHUB_ACTOR" --password-stdin git.thehuf.uk
+            | podman login --username "$GITHUB_ACTOR" --password-stdin "$REGISTRY"
           podman push "$IMAGE:$SHA"
           podman push "$IMAGE:latest"
           case "$GITHUB_REF" in
             refs/tags/*) podman push "$IMAGE:$GITHUB_REF_NAME" ;;
           esac
-          podman logout git.thehuf.uk
+          podman logout "$REGISTRY"
