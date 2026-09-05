@@ -68,6 +68,18 @@ Firefox gives it sound and a black picture. Then a progressive file before
 merging with whatever audio is left, because that merge can put Opus in an mp4,
 which an iPhone plays without any sound at all.
 
+## Releases
+
+`release-please` reads the Conventional Commits on `main` and keeps a release
+pull request up to date with the next version and the changelog. Merging it
+writes `version.txt` and `CHANGELOG.md`, tags the commit and publishes a GitHub
+release, which in turn builds the image and pushes it to `ghcr.io`. The version
+is passed to the build as `MAGNETO_VERSION`, so a running container can say
+which release it is.
+
+While the major is 0, a `feat` moves the minor and a `fix` moves the patch. The
+first release is 0.1.0 and its changelog covers everything added since the fork.
+
 ## Screenshots
 
 `docs/screens` is generated, not collected by hand. A test starts the app on an

@@ -1,0 +1,21 @@
+# The changelog and the version number are read from the commit messages, so
+# nothing has to be written twice. This keeps a release pull request open and
+# up to date; merging it is what tags a version and publishes the release.
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

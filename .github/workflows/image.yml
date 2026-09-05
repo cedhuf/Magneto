@@ -1,0 +1,46 @@
+# Built when a release is published, never on a push: most commits do not
+# deserve an image, and the tag is what says which ones do.
+name: Container image
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the version
+        id: version
+        run: echo "value=$(cat version.txt)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The version reaches the running app through this build argument, and
+      # /admin shows it: that is the answer to "is the fix I pushed the one I am
+      # looking at".
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: MAGNETO_VERSION=${{ steps.version.outputs.value }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/magneto:${{ steps.version.outputs.value }}
+            ghcr.io/${{ github.repository_owner }}/magneto:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.version.outputs.value }}

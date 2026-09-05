@@ -25,7 +25,15 @@ files and the database in two named volumes, and restarts the container with the
 host. Everything is configured there, so editing it and running `docker compose
 up -d` again is the whole administration.
 
-To run it without Docker, on a machine that already has yt-dlp and ffmpeg:
+To run a published version instead of building one:
+
+```bash
+docker run -d -p 8899:8899 \
+  -v magneto-downloads:/app/downloads -v magneto-data:/app/data \
+  ghcr.io/cedhuf/magneto:latest
+```
+
+To run it from source, on a machine that already has yt-dlp and ffmpeg:
 
 ```bash
 brew install yt-dlp ffmpeg    # or apt install ffmpeg && pip install yt-dlp
@@ -52,6 +60,18 @@ card that outlived it. Pins hold a file longer within a limit the admin sets.
 
 Runs for several people behind a forward-auth proxy, where each account has its
 own entries, its own follows and its own history.
+
+## Releases
+
+Versions come from the commit messages. Every commit says what it changes with a
+[Conventional Commits](https://www.conventionalcommits.org) prefix, and
+release-please keeps a pull request open that holds the next version number and
+the changelog it has worked out. Merging that pull request tags the version,
+publishes the release and builds the image. Nothing is written twice and nothing
+is decided by hand except when to press the button.
+
+Images are at `ghcr.io/cedhuf/magneto`, tagged with the version and `latest`.
+The version reaches the running app and `/admin` shows it.
 
 ## Documentation
 

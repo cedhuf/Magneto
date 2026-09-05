@@ -132,11 +132,28 @@ HISTORY_MAX = int(os.environ.get("MAGNETO_HISTORY_MAX", 200))
 SWEEP_INTERVAL = 60
 
 
-# The commit this image was built from, stamped at build time. Falling back to
-# the date of the code itself is enough to answer the only question anyone asks
-# of it: is what I am looking at the version I just deployed?
-VERSION = os.environ.get("MAGNETO_VERSION") or time.strftime(
-    "%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(__file__)))
+def _version():
+    """What /admin shows, to answer the only question anyone asks of it: is what
+    I am looking at the version I just deployed?
+
+    The image stamps the released version into the environment at build time. A
+    checkout reads the file the release process writes. Failing both, the date
+    of the code itself still says something true.
+    """
+    stamped = os.environ.get("MAGNETO_VERSION")
+    if stamped:
+        return stamped
+    marker = os.path.join(os.path.dirname(__file__), "version.txt")
+    try:
+        recorded = open(marker).read().strip()
+    except OSError:
+        recorded = ""
+    if recorded and recorded != "0.0.0":
+        return recorded
+    return time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(__file__)))
+
+
+VERSION = _version()
 
 
 # YouTube judges an IPv6 prefix on the whole neighbourhood behind it, so a host
