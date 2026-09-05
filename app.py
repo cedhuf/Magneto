@@ -41,6 +41,14 @@ FEED_QUALITIES = [360, 480, 720, 1080, 1440]
 # refreshed at a time, at most one every FEED_POLL seconds, and only when its
 # cached copy is older than FEED_TTL.
 FEED_POLL = int(os.environ.get("RECLIP_FEED_POLL", 300))
+# One clock per platform, and its own value: the pollers already run side by
+# side, so a provider that tolerates being asked more often should be asked more
+# often, without that spending anybody else's patience. TikTok falls back to
+# YouTube's spacing rather than to a number of its own invention.
+POLL = {
+    "youtube": FEED_POLL,
+    "tiktok": int(os.environ.get("RECLIP_TIKTOK_POLL", FEED_POLL)),
+}
 FEED_TTL = int(os.environ.get("RECLIP_FEED_TTL", 6 * 3600))
 FEED_COOLDOWN = int(os.environ.get("RECLIP_FEED_COOLDOWN", 600))
 # One ceiling per platform, not one for the lot: what a ceiling protects is one
@@ -590,7 +598,7 @@ def feed_poller(platform):
     """
     budget = BUDGETS[platform]
     while True:
-        time.sleep(FEED_POLL)
+        time.sleep(POLL[platform])
         row = None
         try:
             row = stalest_slot(platform)
@@ -718,7 +726,7 @@ BUDGETS = {"youtube": Budget(), "tiktok": Budget()}
 
 def channel_call_allowed(platform):
     """Space out lookups of one platform, whatever triggered them."""
-    return time.time() - BUDGETS[platform].last_call >= FEED_POLL
+    return time.time() - BUDGETS[platform].last_call >= POLL[platform]
 
 
 def get_settings(owner):
@@ -1247,7 +1255,8 @@ def provider_state(owner, provider):
             "items": [{"channel_id": r["channel_id"], "title": r["title"],
                        "fetched": r[listed], "failed": not r[seen_tab]} for r in rows],
             "followed": len(rows), "limit": CHANNELS_MAX[platform],
-            "slots": slots, "round": slots * FEED_POLL,
+            "slots": slots, "round": slots * POLL[platform],
+            "every": POLL[platform],
             "never": sum(1 for r in rows if not r[listed] and r[seen_tab])}
 
 
@@ -1418,7 +1427,7 @@ def import_subscriptions():
         return jsonify({"error": "No channels found in this file"}), 400
     return jsonify({"added": added, "already": already, "skipped": skipped,
                     "full": full, "limit": CHANNELS_MAX["youtube"],
-                    "every": FEED_POLL})
+                    "every": POLL["youtube"]})
 
 
 @app.route("/api/tiktok/import", methods=["POST"])
@@ -1472,7 +1481,7 @@ def import_tiktok():
         return jsonify({"error": "No accounts found in this file"}), 400
     return jsonify({"added": added, "already": already, "skipped": skipped,
                     "full": full, "limit": CHANNELS_MAX["tiktok"],
-                    "every": FEED_POLL})
+                    "every": POLL["tiktok"]})
 
 
 @app.route("/api/feed/refresh", methods=["POST"])

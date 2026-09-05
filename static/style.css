@@ -1422,6 +1422,12 @@ body.full .shorts-caption { border-radius: 0; }
   font-size: 1.15rem;
   color: var(--fg);
 }
+.figure-hint {
+  margin-top: 2px;
+  font-size: 0.58rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
 @media (max-width: 720px) {
   .figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

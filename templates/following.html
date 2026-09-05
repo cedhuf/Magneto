@@ -36,12 +36,14 @@
       const cells = [
         ['Followed', `${provider.followed} of ${provider.limit}`],
         ['In the queue', `${provider.slots} slot${provider.slots === 1 ? '' : 's'}`],
-        ['One full round', fmtRound(provider.round)],
+        ['One full round', fmtRound(provider.round),
+         `one lookup every ${Math.round(provider.every / 60)} min`],
         ['Never read yet', provider.never],
       ];
-      return cells.map(([label, value]) =>
+      return cells.map(([label, value, hint]) =>
         `<div class="figure"><div class="figure-label">${label}</div>
-           <div class="figure-value">${esc(String(value))}</div></div>`).join('');
+           <div class="figure-value">${esc(String(value))}</div>
+           ${hint ? `<div class="figure-hint">${esc(hint)}</div>` : ''}</div>`).join('');
     }
 
     function render() {

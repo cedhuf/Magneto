@@ -104,8 +104,8 @@ feed off.
 
 Accounts are followed on the **Following** page, alongside the YouTube channels.
 
-Each platform has its own queue, its own clock and its own ceiling, with its own
-value for that ceiling. YouTube
+Each platform has its own queue, its own clock and its own ceiling, each with its
+own value, and its poller runs beside the others rather than behind them. YouTube
 cannot see what TikTok was asked, so making them share one budget had each
 paying for the other's curiosity while protecting neither. A third platform
 would get its own the same way.
@@ -295,7 +295,8 @@ date rather than stored.
 | `RECLIP_SHORTS_RETENTION` | `86400` | Seconds a fetched short or TikTok clip is kept. A watched clip leaves the reel, so what this holds is one person's day of watching rather than everything their accounts list. Never pinned, and out of the history ceiling |
 | `RECLIP_SEEN_RETENTION` | `604800` | Seconds a "watched" row is kept. Past the point where the clip has left every listing, the row can no longer hide anything |
 | `RECLIP_FEED_VIDEOS` | `5` | Ceiling for the per-user feed setting, not the setting itself |
-| `RECLIP_FEED_POLL` | `300` | Seconds between two lookups of one platform. Each platform keeps its own clock, its own lock and its own queue: spacing exists to avoid being refused by a provider, and a provider only sees its own traffic |
+| `RECLIP_FEED_POLL` | `300` | Seconds between two YouTube lookups. Each platform keeps its own clock, its own lock and its own queue: spacing exists to avoid being refused by a provider, and a provider only sees its own traffic |
+| `RECLIP_TIKTOK_POLL` | same as above | Seconds between two TikTok lookups. The pollers run side by side, so a provider that tolerates being asked more often can be, without spending anybody else's patience |
 | `RECLIP_FEED_TTL` | `21600` | Age at which a cached channel is worth looking up again |
 | `RECLIP_FEED_COOLDOWN` | `600` | Minimum age before a manual refresh does anything |
 | `RECLIP_FEED_CHANNELS_MAX` | `30` | YouTube channels one account may follow |
