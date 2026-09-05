@@ -2,9 +2,11 @@
 # deserve an image, and the tag is what says which ones do.
 name: Container image
 
+# Called by the release workflow, in the same run: an event raised by the run
+# token starts no other workflow, so a release cannot trigger this one on its
+# own. Also available by hand, to rebuild an image without cutting a version.
 on:
-  release:
-    types: [published]
+  workflow_call:
   workflow_dispatch:
 
 permissions:
