@@ -16,7 +16,7 @@ page. The download side still works the way the original does.
 brew install yt-dlp ffmpeg    # or apt install ffmpeg && pip install yt-dlp
 git clone <this repository>
 cd reclip
-./reclip.sh
+./magneto.sh
 ```
 
 Then open http://localhost:8899.

@@ -46,11 +46,11 @@ from under `/s`.
 ## Retention
 
 Files are temporary, the list is not. A file is deleted once it reaches
-`RECLIP_RETENTION` and each card shows how long it has left. Its entry stays, so
+`MAGNETO_RETENTION` and each card shows how long it has left. Its entry stays, so
 the download can be started again from the same card with one click. Both live in
 `/app/data` and `/app/downloads`, which is all a volume needs to cover.
 
-Pin an entry to keep its file until `RECLIP_PIN_RETENTION` instead. A pin moves
+Pin an entry to keep its file until `MAGNETO_PIN_RETENTION` instead. A pin moves
 the deadline to a longer one the admin still owns rather than exempting the file,
 which is what keeps the disk bounded. Delete an entry and both the file and the
 row go at once.
@@ -82,4 +82,7 @@ which an iPhone plays without any sound at all.
   `yt-dlp[default,deno]`. YouTube's player challenge needs a real JS engine;
   without one yt-dlp falls back to clients YouTube may refuse, and formats go
   missing behind a misleading "This video is unavailable"
-- SQLite, with append-only migrations keyed on `PRAGMA user_version`
+- SQLite, with migrations keyed on `PRAGMA user_version`. The fifteen that grew
+  the schema were squashed into one while the project was unshared; a database
+  left at the end of that chain is stamped rather than replayed, and nothing
+  older is carried

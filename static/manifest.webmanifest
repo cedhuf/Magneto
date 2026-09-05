@@ -1,6 +1,6 @@
 {
-  "name": "ReClip",
-  "short_name": "ReClip",
+  "name": "Magneto",
+  "short_name": "Magneto",
   "description": "Downloads and reading, on your own server.",
   "start_url": "/",
   "scope": "/",

@@ -1,4 +1,4 @@
-"""ReClip: the application, and nothing else.
+"""Magneto: the application, and nothing else.
 
 Every page lives in its own module and arrives as a blueprint. What is left here
 is what belongs to no page: the app itself, the gate that closes what an instance

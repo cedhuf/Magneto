@@ -41,8 +41,8 @@ else
 fi
 
 # Keep yt-dlp fresh — sites (Instagram, Facebook, etc.) break its extractors
-# frequently, and the usual fix is simply updating yt-dlp. Skip with RECLIP_NO_UPDATE=1.
-if [ -z "$RECLIP_NO_UPDATE" ]; then
+# frequently, and the usual fix is simply updating yt-dlp. Skip with MAGNETO_NO_UPDATE=1.
+if [ -z "$MAGNETO_NO_UPDATE" ]; then
     echo "Updating yt-dlp..."
     pip install -q -U yt-dlp || echo "  (couldn't update yt-dlp — continuing with the installed version)"
 fi
@@ -51,6 +51,6 @@ PORT="${PORT:-8899}"
 export PORT
 
 echo ""
-echo "  ReClip is running at http://localhost:$PORT"
+echo "  Magneto is running at http://localhost:$PORT"
 echo ""
 python3 app.py

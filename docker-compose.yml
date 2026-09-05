@@ -11,12 +11,12 @@ services:
     environment:
       # Personal instance: one implicit user, nothing to log into.
       # Set to "proxy" behind a forward-auth proxy, and bind to localhost then.
-      RECLIP_AUTH: "none"
-      RECLIP_RETENTION: "86400"
+      MAGNETO_AUTH: "none"
+      MAGNETO_RETENTION: "86400"
       # The two pages that talk to YouTube on their own. Off unless asked for.
-      RECLIP_FEED: "0"
-      RECLIP_SHORTS: "0"
-      RECLIP_TIKTOK: "0"
+      MAGNETO_FEED: "0"
+      MAGNETO_SHORTS: "0"
+      MAGNETO_TIKTOK: "0"
     restart: unless-stopped
 
 volumes:

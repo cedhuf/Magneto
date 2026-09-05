@@ -21,90 +21,62 @@ def connect():
 MIGRATIONS = [
     """
     CREATE TABLE entries (
-        job_id     TEXT PRIMARY KEY,
-        owner      TEXT NOT NULL,
-        url        TEXT NOT NULL,
-        title      TEXT,
-        thumbnail  TEXT,
-        format     TEXT,
-        format_id  TEXT,
-        filename   TEXT,
-        path       TEXT,
-        status     TEXT NOT NULL,
-        error      TEXT,
-        created_at REAL NOT NULL
+        job_id      TEXT PRIMARY KEY,
+        owner       TEXT NOT NULL,
+        url         TEXT NOT NULL,
+        title       TEXT,
+        thumbnail   TEXT,
+        format      TEXT,
+        format_id   TEXT,
+        formats     TEXT,
+        filename    TEXT,
+        path        TEXT,
+        status      TEXT NOT NULL,
+        error       TEXT,
+        created_at  REAL NOT NULL,
+        pinned      INTEGER NOT NULL DEFAULT 0,
+        uploader    TEXT,
+        duration    REAL,
+        description TEXT,
+        upload_date TEXT,
+        variant     TEXT,
+        kind        TEXT NOT NULL DEFAULT 'video'
     );
     CREATE INDEX entries_owner ON entries (owner, created_at DESC);
-    """,
-    """
-    ALTER TABLE entries ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
-    """,
-    """
-    ALTER TABLE entries ADD COLUMN formats TEXT;
-    """,
-    """
-    ALTER TABLE entries ADD COLUMN uploader TEXT;
-    ALTER TABLE entries ADD COLUMN duration REAL;
-    """,
-    """
-    ALTER TABLE entries ADD COLUMN description TEXT;
-    ALTER TABLE entries ADD COLUMN upload_date TEXT;
-    """,
-    """
-    CREATE TABLE subscriptions (
-        owner        TEXT NOT NULL,
-        channel_id   TEXT NOT NULL,
-        channel_url  TEXT NOT NULL,
-        title        TEXT,
-        thumbnail    TEXT,
-        videos       TEXT NOT NULL DEFAULT '[]',
-        refreshed_at REAL NOT NULL DEFAULT 0,
-        PRIMARY KEY (owner, channel_id)
-    );
-    """,
-    """
-    CREATE TABLE settings (
-        owner        TEXT PRIMARY KEY,
-        feed_videos  INTEGER NOT NULL,
-        feed_quality INTEGER NOT NULL
-    );
-    """,
-    """
+
     CREATE TABLE channels (
-        channel_id   TEXT PRIMARY KEY,
-        channel_url  TEXT NOT NULL,
-        title        TEXT,
-        thumbnail    TEXT,
-        videos       TEXT NOT NULL DEFAULT '[]',
-        refreshed_at REAL NOT NULL DEFAULT 0
+        channel_id          TEXT PRIMARY KEY,
+        channel_url         TEXT NOT NULL,
+        title               TEXT,
+        thumbnail           TEXT,
+        platform            TEXT NOT NULL DEFAULT 'youtube',
+        videos              TEXT NOT NULL DEFAULT '[]',
+        refreshed_at        REAL NOT NULL DEFAULT 0,
+        has_videos          INTEGER NOT NULL DEFAULT 1,
+        shorts              TEXT NOT NULL DEFAULT '[]',
+        shorts_refreshed_at REAL NOT NULL DEFAULT 0,
+        has_shorts          INTEGER NOT NULL DEFAULT 1
     );
-    INSERT OR IGNORE INTO channels
-        (channel_id, channel_url, title, thumbnail, videos, refreshed_at)
-        SELECT channel_id, channel_url, title, thumbnail, videos, refreshed_at
-        FROM subscriptions;
+
     CREATE TABLE follows (
         owner      TEXT NOT NULL,
         channel_id TEXT NOT NULL,
         PRIMARY KEY (owner, channel_id)
     );
-    INSERT OR IGNORE INTO follows (owner, channel_id)
-        SELECT owner, channel_id FROM subscriptions;
-    DROP TABLE subscriptions;
-    """,
-    """
-    ALTER TABLE entries ADD COLUMN variant TEXT;
-    """,
-    """
-    ALTER TABLE channels ADD COLUMN shorts TEXT NOT NULL DEFAULT '[]';
-    ALTER TABLE channels ADD COLUMN shorts_refreshed_at REAL NOT NULL DEFAULT 0;
-    """,
-    """
-    ALTER TABLE entries ADD COLUMN kind TEXT NOT NULL DEFAULT 'video';
-    """,
-    """
-    ALTER TABLE channels ADD COLUMN platform TEXT NOT NULL DEFAULT 'youtube';
-    """,
-    """
+
+    CREATE TABLE settings (
+        owner        TEXT PRIMARY KEY,
+        feed_videos  INTEGER NOT NULL,
+        feed_quality INTEGER NOT NULL
+    );
+
+    CREATE TABLE seen (
+        owner TEXT NOT NULL,
+        url   TEXT NOT NULL,
+        at    REAL NOT NULL,
+        PRIMARY KEY (owner, url)
+    );
+
     CREATE TABLE shares (
         token      TEXT PRIMARY KEY,
         job_id     TEXT NOT NULL,
@@ -114,24 +86,21 @@ MIGRATIONS = [
     );
     CREATE INDEX shares_job ON shares (job_id);
     """,
-    """
-    ALTER TABLE channels ADD COLUMN has_videos INTEGER NOT NULL DEFAULT 1;
-    ALTER TABLE channels ADD COLUMN has_shorts INTEGER NOT NULL DEFAULT 1;
-    """,
-    """
-    CREATE TABLE seen (
-        owner TEXT NOT NULL,
-        url   TEXT NOT NULL,
-        at    REAL NOT NULL,
-        PRIMARY KEY (owner, url)
-    );
-    """,
 ]
+
+# Fifteen migrations grew this schema while the project was unshared; they were
+# squashed into the one above. A database left at the end of that chain already
+# has the schema, so it is stamped rather than replayed. Nothing older is
+# carried: there was nobody else to carry it for.
+SQUASHED_AT = 15
 
 
 def migrate():
     with connect() as conn:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
+        if version == SQUASHED_AT:
+            conn.execute(f"PRAGMA user_version = {len(MIGRATIONS)}")
+            return
         for i, script in enumerate(MIGRATIONS[version:], start=version):
             conn.executescript(script)
             conn.execute(f"PRAGMA user_version = {i + 1}")

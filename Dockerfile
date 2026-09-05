@@ -18,8 +18,8 @@ COPY . .
 
 # Which commit this image was built from, so the running instance can say what
 # it is rather than leaving anyone to guess whether a fix is deployed.
-ARG RECLIP_VERSION=unknown
-ENV RECLIP_VERSION=$RECLIP_VERSION
+ARG MAGNETO_VERSION=unknown
+ENV MAGNETO_VERSION=$MAGNETO_VERSION
 
 RUN useradd -m -u 1000 reclip && \
     mkdir -p /app/downloads /app/data && \
@@ -32,6 +32,6 @@ ENV PATH=/home/reclip/.local/bin:$PATH
 EXPOSE 8899
 
 ENTRYPOINT ["sh", "/app/docker-entrypoint.sh"]
-# Shell form so RECLIP_BIND can be set from the compose file. In proxy mode the
+# Shell form so MAGNETO_BIND can be set from the compose file. In proxy mode the
 # identity is a header, so the bind address is a security setting, not a detail.
-CMD ["sh", "-c", "exec gunicorn -b \"${RECLIP_BIND:-0.0.0.0:8899}\" -w 1 --threads 4 --timeout 600 --access-logfile - app:app"]
+CMD ["sh", "-c", "exec gunicorn -b \"${MAGNETO_BIND:-0.0.0.0:8899}\" -w 1 --threads 4 --timeout 600 --access-logfile - app:app"]
