@@ -131,7 +131,7 @@ function wireFollowing(provider) {
     if (!file) return;
     message('Reading the file…');
     try {
-      const res = await fetch(provider.import, {
+      const res = await fetch(provider.imports, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(await READERS[platform](file)),

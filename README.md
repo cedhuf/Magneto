@@ -361,6 +361,36 @@ never carries rules for a page it is not.
 `/static` is behind the sign-in, so that page carries its own small sheet served
 from under `/s`.
 
+## Modules
+
+One file per thing that can break on its own.
+
+```
+config.py    every knob, read from the environment once
+db.py        the SQLite file, its migrations, its entries
+auth.py      who is asking, from the proxy's headers
+media.py     what to fetch, how long to keep it, the sweep
+feed.py      what providers share: budgets, queue, reel, registry
+youtube.py   YouTube's listings and the pages that read them
+tiktok.py    TikTok's listings and the page that reads them
+follows.py   the Following page, whatever the provider
+share.py     public links
+admin.py     the figures and the two ways to empty the instance
+entries.py   the downloader itself
+app.py       the app, the gate, the home page, nothing else
+```
+
+Each page arrives as a Flask blueprint, so a bug on one provider is in one file.
+A provider does not appear in a list of names written somewhere else either: it
+registers itself with `feed.register()` at import, saying what it is called,
+where a URL is added and how its listings are read. The queue, the poller and
+the Following page work from that registry, so a third provider is a file rather
+than an edit spread over five.
+
+Configuration is reached as `config.NAME` rather than imported by name: a
+setting changed at runtime, in a test or elsewhere, then changes everywhere,
+which is what a setting is.
+
 ## Stack
 
 - **Backend:** Python + Flask (~150 lines)
