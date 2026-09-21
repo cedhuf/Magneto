@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.1.1](https://github.com/cedhuf/Magneto/compare/v0.1.0...v0.1.1) (2026-09-21)
+
+
+### Fixed
+
+* **config:** create the data and download directories on start ([02d3d2a](https://github.com/cedhuf/Magneto/commit/02d3d2a5731c50719549e9b9fb2fc668fd5fa2dd))
+* **run:** install yt-dlp with its extras from source too ([3bc69e7](https://github.com/cedhuf/Magneto/commit/3bc69e7b5a52555f2703ad53ee9be1e86ef5ee17))
+
+
+### Changed
+
+* **db:** drop the stamp for databases from before the squash ([b63e7cd](https://github.com/cedhuf/Magneto/commit/b63e7cd911c030fc1a0192c968da86ba5cd996b6))
+* **entries:** validate the requested URL in one place ([a35b61c](https://github.com/cedhuf/Magneto/commit/a35b61c113a7d37e2eeaaf5b886e6eb74e89dd9b))
+* **feed:** a provider gets its budget when it registers ([0d08d50](https://github.com/cedhuf/Magneto/commit/0d08d5048a835d6c6f17adccbf066dcd2a1cb44e))
+* **feed:** one import loop for every provider ([6f9d544](https://github.com/cedhuf/Magneto/commit/6f9d54454bfc7029dcb05da5f9fdb375ddab2c2d))
+* **run:** check the prerequisites in one loop ([64ca684](https://github.com/cedhuf/Magneto/commit/64ca6840c1b78f0f747f2cce7f114072d60a0490))
+* small cuts across modules, one bound for settings, one test for a file ([93accd0](https://github.com/cedhuf/Magneto/commit/93accd0d952cfed2e6554237e5153d598402180a))
+
 ## [0.1.0](https://github.com/cedhuf/Magneto/compare/v0.0.1...v0.1.0) (2026-09-05)
 
 
