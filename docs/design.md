@@ -84,13 +84,26 @@ cache between releases.
 While the major is 0, a `feat` moves the minor and a `fix` moves the patch. The
 first release is 0.1.0 and its changelog covers everything added since the fork.
 
+## Tests
+
+Every file in `tests/` is a plain script that exits non-zero when something
+breaks: no framework, no fixtures. Python ones need what `requirements.txt`
+installs, JS ones need Node and nothing else. Each test gets its own database
+and download directory in a temporary folder, so running the suite never
+touches a working copy's files.
+
+```bash
+tests/run.sh
+```
+
 ## Screenshots
 
 `docs/screens` is generated, not collected by hand. A test starts the app on an
 ephemeral port with a throwaway database, seeds a few channels and downloads it
 makes up on the spot, and takes three shots with Playwright. Thumbnails are
 gradients built in the test rather than images fetched from anybody. Rerun it
-after a change that touches those pages and the documentation stops lying.
+after a change that touches those pages and the documentation stops lying:
+`MAGNETO_SCREENSHOTS=1 tests/run.sh`, with Playwright installed.
 
 ## Stack
 

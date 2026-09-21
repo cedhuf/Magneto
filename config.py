@@ -7,7 +7,7 @@ import os
 import time
 
 
-DOWNLOAD_DIR = os.path.join(os.path.dirname(__file__), "downloads")
+DOWNLOAD_DIR = os.environ.get("MAGNETO_DOWNLOADS", os.path.join(os.path.dirname(__file__), "downloads"))
 
 
 DB_PATH = os.environ.get("MAGNETO_DB", os.path.join(os.path.dirname(__file__), "data", "magneto.db"))

@@ -30,6 +30,7 @@ date rather than stored.
 | `MAGNETO_TIKTOK_ACCOUNTS_MAX` | `30` | TikTok accounts one account may follow. Its own number, not a share of the one above: 300 YouTube channels are not the same cost nor the same risk as 150 of each |
 | `MAGNETO_PIN_RETENTION` | `2592000` | Seconds a pinned file is kept. A pin moves the deadline, it does not lift it, so the disk stays bounded |
 | `MAGNETO_HISTORY_MAX` | `200` | Entries kept per user. Older ones are dropped, pinned ones never |
+| `MAGNETO_DOWNLOADS` | `downloads/` | Directory the files are written to. The sweep deletes anything in it that no entry claims, so give it to Magneto alone |
 | `MAGNETO_DB` | `data/magneto.db` | SQLite file. Put it on the same volume as the downloads, not inside the downloads directory |
 | `MAGNETO_BIND` | `0.0.0.0:8899` | What gunicorn listens on. In proxy mode, `127.0.0.1:8899` when the proxy is on the same host; otherwise the reachable address, with the port firewalled to the proxy |
 | `MAGNETO_FORCE_IPV4` | `1` | Ask YouTube over IPv4. A v6 prefix is judged on everything behind it, so a host that has downloaded nothing at all can be refused with "Sign in to confirm you're not a bot" while the same request over v4 succeeds from the same machine. Set to `0` only on a host with no v4 route |
