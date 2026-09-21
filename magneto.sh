@@ -2,31 +2,12 @@
 set -e
 cd "$(dirname "$0")"
 
-# Check prerequisites
 missing=""
-
-if ! command -v python3 &> /dev/null; then
-    missing="$missing python3"
-fi
-
-if ! command -v yt-dlp &> /dev/null; then
-    missing="$missing yt-dlp"
-fi
-
-if ! command -v ffmpeg &> /dev/null; then
-    missing="$missing ffmpeg"
-fi
-
+for tool in python3 yt-dlp ffmpeg; do
+    command -v "$tool" >/dev/null || missing="$missing $tool"
+done
 if [ -n "$missing" ]; then
     echo "Missing required tools:$missing"
-    echo ""
-    if command -v brew &> /dev/null; then
-        echo "Install with:  brew install$missing"
-    elif command -v apt &> /dev/null; then
-        echo "Install with:  sudo apt install$missing"
-    else
-        echo "Please install:$missing"
-    fi
     exit 1
 fi
 
