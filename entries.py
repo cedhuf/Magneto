@@ -77,15 +77,22 @@ def remember(owner, url, info):
         return job_id
 
 
+def requested_url(data):
+    """The URL a request carries, or the 400 that refuses it."""
+    url = (data.get("url") or "").strip()
+    if not url:
+        return None, (jsonify({"error": "No URL provided"}), 400)
+    if not is_safe_url(url):
+        return None, (jsonify({"error": "Invalid URL"}), 400)
+    return url, None
+
+
 @bp.route("/api/info", methods=["POST"])
 def get_info():
     owner = current_user()
-    data = request.json
-    url = data.get("url", "").strip()
-    if not url:
-        return jsonify({"error": "No URL provided"}), 400
-    if not is_safe_url(url):
-        return jsonify({"error": "Invalid URL"}), 400
+    url, refused = requested_url(request.json)
+    if refused:
+        return refused
 
     cmd = [*config.YTDLP, "--no-playlist", "-j", "--", url]
     try:
@@ -166,12 +173,9 @@ def get_info():
 @bp.route("/api/playlist", methods=["POST"])
 def get_playlist_info():
     current_user()
-    data = request.json
-    url = data.get("url", "").strip()
-    if not url:
-        return jsonify({"error": "No URL provided"}), 400
-    if not is_safe_url(url):
-        return jsonify({"error": "Invalid URL"}), 400
+    url, refused = requested_url(request.json)
+    if refused:
+        return refused
 
     cmd = [*config.YTDLP, "--flat-playlist", "--playlist-end", str(config.PLAYLIST_MAX + 1),
            "-J", "--", url]
@@ -196,7 +200,9 @@ def get_playlist_info():
 def start_download():
     owner = current_user()
     data = request.json
-    url = data.get("url", "").strip()
+    url, refused = requested_url(data)
+    if refused:
+        return refused
     format_choice = data.get("format", "video")
     format_id = data.get("format_id")
     title = data.get("title", "")
@@ -208,11 +214,6 @@ def start_download():
         max_height = int(data.get("max_height") or 0) or None
     except (TypeError, ValueError):
         max_height = None
-
-    if not url:
-        return jsonify({"error": "No URL provided"}), 400
-    if not is_safe_url(url):
-        return jsonify({"error": "Invalid URL"}), 400
 
     # Starting a history entry again reuses its row, so the list does not grow a
     # duplicate every time a swept file is fetched anew.
