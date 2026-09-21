@@ -20,10 +20,12 @@ from media import variant_of
 # queue, the poller and the Following page work from this and never from a list
 # of platform names written somewhere else.
 PROVIDERS = {}
+BUDGETS = {}
 
 
 def register(platform, **spec):
     PROVIDERS[platform] = {"platform": platform, **spec}
+    BUDGETS[platform] = Budget()
 
 
 class Budget:
@@ -44,9 +46,6 @@ class Budget:
         # Which tab went last, so ties alternate rather than starving one.
         # Only YouTube has two, but every platform carries the field.
         self.last_tab = "shorts"
-
-
-BUDGETS = {"youtube": Budget(), "tiktok": Budget()}
 
 
 def channel_call_allowed(platform):
