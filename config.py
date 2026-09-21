@@ -10,10 +10,12 @@ import time
 DOWNLOAD_DIR = os.path.join(os.path.dirname(__file__), "downloads")
 
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+DB_PATH = os.environ.get("MAGNETO_DB", os.path.join(os.path.dirname(__file__), "data", "magneto.db"))
 
 
-DB_PATH = os.environ.get("MAGNETO_DB", os.path.join(DATA_DIR, "magneto.db"))
+# A fresh checkout has neither: both are gitignored.
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 
 RETENTION = int(os.environ.get("MAGNETO_RETENTION", 24 * 3600))
