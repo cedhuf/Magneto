@@ -3,10 +3,11 @@
 import os
 import secrets
 import time
-from flask import Blueprint, request, jsonify, send_file, render_template, abort, make_response, current_app
+from flask import Blueprint, jsonify, send_file, render_template, abort, make_response, current_app
 import config
 from db import connect, get_entry
 from auth import current_user
+from media import has_file
 
 bp = Blueprint("share", __name__)
 
@@ -20,7 +21,7 @@ def shared_entry(token):
             "SELECT e.* FROM shares s JOIN entries e ON e.job_id = s.job_id "
             "WHERE s.token = ? AND s.expires_at > ?",
             (token, time.time())).fetchone()
-    if row is None or not row["path"] or not os.path.exists(row["path"]):
+    if row is None or not has_file(row):
         return None
     return row
 
@@ -77,7 +78,7 @@ def create_share(job_id):
     same file are two things to revoke and one more chance to miss one."""
     owner = current_user()
     row = get_entry(job_id, owner)
-    if row is None or not row["path"] or not os.path.exists(row["path"]):
+    if row is None or not has_file(row):
         return jsonify({"error": "File not ready"}), 404
     now = time.time()
     with connect() as conn:

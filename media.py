@@ -4,12 +4,10 @@ import glob
 import json
 import logging
 import os
-import re
-import shutil
 import subprocess
 import threading
 import time
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse
 import config
 from db import connect, live_shares, update_entry
 
@@ -42,6 +40,10 @@ def twin_of(url, variant):
         if os.path.exists(row["path"]):
             return row
     return None
+
+
+def has_file(row):
+    return bool(row["path"]) and os.path.exists(row["path"])
 
 
 def file_size(path):
@@ -101,7 +103,7 @@ def entry_json(row):
         "error": row["error"],
         "pinned": bool(row["pinned"]),
         "kind": row["kind"],
-        "has_file": bool(row["path"]) and os.path.exists(row["path"]),
+        "has_file": has_file(row),
         "expires_in": seconds_left(row),
     }
 
@@ -128,12 +130,10 @@ def parse_ytdlp_json(stdout):
     several objects and a plain ``json.loads`` raises "Extra data".
     Return the first valid object.
     """
-    for line in stdout.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        return json.loads(line)
-    raise ValueError("yt-dlp returned no data")
+    first = next((line for line in stdout.splitlines() if line.strip()), None)
+    if first is None:
+        raise ValueError("yt-dlp returned no data")
+    return json.loads(first)
 
 
 def drop_file(path, keeping=None):

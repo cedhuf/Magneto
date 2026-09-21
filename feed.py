@@ -54,28 +54,30 @@ def channel_call_allowed(platform):
     return time.time() - BUDGETS[platform].last_call >= config.POLL[platform]
 
 
-def get_settings(owner):
-    """Per-user feed settings, always within what the instance allows."""
-    with connect() as conn:
-        row = conn.execute("SELECT * FROM settings WHERE owner = ?", (owner,)).fetchone()
-    videos = row["feed_videos"] if row else config.FEED_DEFAULTS["videos"]
-    quality = row["feed_quality"] if row else config.FEED_DEFAULTS["quality"]
+def bounded(videos, quality):
+    """Settings within what the instance allows, which may have shrunk since."""
     return {"videos": max(1, min(videos, config.FEED_VIDEOS_MAX)),
             "quality": quality if quality in config.FEED_QUALITIES else config.FEED_DEFAULTS["quality"]}
 
 
+def get_settings(owner):
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM settings WHERE owner = ?", (owner,)).fetchone()
+    if not row:
+        return bounded(config.FEED_DEFAULTS["videos"], config.FEED_DEFAULTS["quality"])
+    return bounded(row["feed_videos"], row["feed_quality"])
+
+
 def save_settings(owner, videos, quality):
-    videos = max(1, min(int(videos), config.FEED_VIDEOS_MAX))
-    quality = int(quality)
-    if quality not in config.FEED_QUALITIES:
-        quality = config.FEED_DEFAULTS["quality"]
+    settings = bounded(int(videos), int(quality))
+    videos, quality = settings["videos"], settings["quality"]
     with connect() as conn:
         conn.execute("INSERT INTO settings (owner, feed_videos, feed_quality) "
                      "VALUES (?, ?, ?) ON CONFLICT(owner) DO UPDATE SET "
                      "feed_videos = excluded.feed_videos, "
                      "feed_quality = excluded.feed_quality",
                      (owner, videos, quality))
-    return {"videos": videos, "quality": quality}
+    return settings
 
 
 def slot_query(platform, tab, column, flag):
@@ -161,7 +163,7 @@ def feed_poller(platform):
                 note_failure(row, e)
 
 
-def refresh_shorts(url, channel_id, platform="youtube"):
+def refresh_shorts(url, channel_id, platform):
     """One account's upright videos, under its own platform's budget."""
     budget = BUDGETS[platform]
     with budget.lock:
@@ -192,14 +194,10 @@ def upright_clips(owner, platform, watched=False):
             "JOIN follows f ON f.channel_id = c.channel_id "
             "WHERE f.owner = ? AND c.platform = ? "
             "ORDER BY c.title COLLATE NOCASE", (owner, platform)).fetchall()
-
-    variant = variant_of("video", None, settings["quality"], vertical=True)
-    with connect() as conn:
+        variant = variant_of("video", None, settings["quality"], vertical=True)
         ready = {r["url"]: r["job_id"] for r in conn.execute(
             "SELECT url, job_id, path FROM entries WHERE variant = ? AND status = 'done' "
             "AND path IS NOT NULL", (variant,)) if os.path.exists(r["path"])}
-
-    with connect() as conn:
         seen = {r["url"] for r in conn.execute(
             "SELECT url FROM seen WHERE owner = ?", (owner,))}
 
@@ -224,9 +222,8 @@ def upright_clips(owner, platform, watched=False):
                 interleaved.append(one[rank])
     # How many were left out, so an empty reel can say "you are up to date"
     # rather than "follow some accounts".
-    payload = {"clips": interleaved, "quality": settings["quality"],
-               "share": config.SHARE_ENABLED, "hidden": hidden, "watched": watched}
-    return payload
+    return {"clips": interleaved, "quality": settings["quality"],
+            "share": config.SHARE_ENABLED, "hidden": hidden, "watched": watched}
 
 
 def followed_count(owner, platform):

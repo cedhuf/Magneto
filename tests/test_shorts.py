@@ -42,7 +42,7 @@ with run_returns(CHANNEL):
 
 # Listing shorts resolves no video: a single call, on the targeted tab.
 with run_returns(SHORTS) as run:
-    feed.refresh_shorts("https://www.youtube.com/@some/videos", "UC1")
+    feed.refresh_shorts("https://www.youtube.com/@some/videos", "UC1", "youtube")
 assert run.call_count == 1, f"{run.call_count} outbound calls to list shorts"
 argv = run.call_args[0][0]
 assert argv[-1].endswith("/shorts") and "--flat-playlist" in argv, argv

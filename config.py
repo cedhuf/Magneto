@@ -80,8 +80,8 @@ CHANNELS_MAX = {
 # Both off unless asked for: they are the only parts of the app that talk to
 # YouTube on their own, and an instance that only downloads what it is given
 # should not be doing that in the background.
-def enabled(name):
-    return os.environ.get(name, "0") not in ("0", "false", "no", "")
+def enabled(name, default="0"):
+    return os.environ.get(name, default) not in ("0", "false", "no", "")
 
 
 FEED_ENABLED = enabled("MAGNETO_FEED")
@@ -158,15 +158,15 @@ def _version():
 VERSION = _version()
 
 
-# YouTube judges an IPv6 prefix on the whole neighbourhood behind it, so a host
-# that has never asked for anything is refused with "Sign in to confirm you're
-# not a bot" while the same request over v4, from the same machine, goes
-# through. Set MAGNETO_FORCE_IPV4=0 on a host that has no v4 route at all.
 # A subscriptions export is a few kilobytes; anything far past that is not one.
 IMPORT_MAX_BYTES = 2 * 1024 * 1024
 
 
-FORCE_IPV4 = os.environ.get("MAGNETO_FORCE_IPV4", "1") not in ("0", "false", "no", "")
+# YouTube judges an IPv6 prefix on the whole neighbourhood behind it, so a host
+# that has never asked for anything is refused with "Sign in to confirm you're
+# not a bot" while the same request over v4, from the same machine, goes
+# through. Set MAGNETO_FORCE_IPV4=0 on a host that has no v4 route at all.
+FORCE_IPV4 = enabled("MAGNETO_FORCE_IPV4", "1")
 
 
 # Every invocation starts from here, so the flag cannot be forgotten on one.

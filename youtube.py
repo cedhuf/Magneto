@@ -43,10 +43,6 @@ def youtube_tab_url(url, tab="videos"):
                                       query="", fragment=""))
 
 
-def youtube_videos_url(url):
-    return youtube_tab_url(url, "videos")
-
-
 def parse_ytdlp_lines(stdout):
     """Every JSON object yt-dlp printed, keyed by video id.
 
@@ -82,7 +78,7 @@ def fetch_channel(url, known=None, count=None):
     date at all, which is what the feed sorts on. So: list flat, then resolve
     only the videos never seen before, which on a refresh is usually none.
     """
-    videos_url = youtube_videos_url(url)
+    videos_url = youtube_tab_url(url)
     if not videos_url:
         raise ValueError("Please enter a YouTube channel URL")
     cmd = [*config.YTDLP, "--flat-playlist", "--playlist-end", str(count or config.FEED_DEFAULTS["videos"]),
@@ -278,7 +274,7 @@ def feed_settings():
 def subscribe():
     owner = current_user()
     url = (request.json or {}).get("url", "").strip()
-    if not is_safe_url(url) or not youtube_videos_url(url):
+    if not is_safe_url(url) or not youtube_tab_url(url):
         return jsonify({"error": "Please enter a YouTube channel URL"}), 400
     return follow(owner, url, refresh_channel, "youtube")
 
@@ -302,7 +298,7 @@ def import_subscriptions():
             channel_id, url = row[0].strip(), row[1].strip()
             # A title may hold commas, so it is whatever is left of the line.
             title = ",".join(row[2:]).strip() or channel_id
-            yield (channel_id, url, title) if is_safe_url(url) and youtube_videos_url(url) else None
+            yield (channel_id, url, title) if is_safe_url(url) and youtube_tab_url(url) else None
 
     return import_follows(current_user(), "youtube", candidates())
 

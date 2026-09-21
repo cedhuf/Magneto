@@ -2,7 +2,6 @@
 
 import glob
 import os
-import time
 import shutil
 from flask import Blueprint, jsonify, render_template
 import config
@@ -23,7 +22,7 @@ def admin_page():
 def admin_overview():
     require_admin()
 
-    on_disk = [p for p in glob.glob(os.path.join(config.DOWNLOAD_DIR, "*"))]
+    on_disk = glob.glob(os.path.join(config.DOWNLOAD_DIR, "*"))
     with connect() as conn:
         rows = conn.execute("SELECT * FROM entries WHERE kind = 'video' "
                             "ORDER BY created_at DESC").fetchall()

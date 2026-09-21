@@ -1,6 +1,5 @@
 """The downloader itself: ask, fetch, list, play, keep, delete."""
 
-import os
 import json
 import re
 import subprocess
@@ -11,7 +10,7 @@ from flask import Blueprint, request, jsonify, send_file
 import config
 from db import connect, get_entry, update_entry
 from auth import current_user
-from media import drop_file, entry_json, is_safe_url, parse_ytdlp_json, run_download, seconds_left, twin_of, variant_of
+from media import drop_file, entry_json, has_file, is_safe_url, parse_ytdlp_json, run_download, seconds_left, twin_of, variant_of
 
 bp = Blueprint("entries", __name__)
 
@@ -271,7 +270,7 @@ def check_status(job_id):
 @bp.route("/api/stream/<job_id>")
 def stream_file(job_id):
     row = get_entry(job_id, current_user())
-    if row is None or not row["path"] or not os.path.exists(row["path"]):
+    if row is None or not has_file(row):
         return jsonify({"error": "File not ready"}), 404
     # Inline rather than an attachment, and conditional so the browser can seek
     # with Range requests instead of pulling the whole file first.
@@ -281,6 +280,6 @@ def stream_file(job_id):
 @bp.route("/api/file/<job_id>")
 def download_file(job_id):
     row = get_entry(job_id, current_user())
-    if row is None or not row["path"] or not os.path.exists(row["path"]):
+    if row is None or not has_file(row):
         return jsonify({"error": "File not ready"}), 404
     return send_file(row["path"], as_attachment=True, download_name=row["filename"])

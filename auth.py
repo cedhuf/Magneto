@@ -1,6 +1,6 @@
 """Who is asking. The identity is a header a forward-auth proxy sets."""
 
-from flask import request, abort, jsonify
+from flask import request, abort
 import config
 
 
