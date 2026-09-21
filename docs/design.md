@@ -120,6 +120,4 @@ after a change that touches those pages and the documentation stops lying:
   without one yt-dlp falls back to clients YouTube may refuse, and formats go
   missing behind a misleading "This video is unavailable"
 - SQLite, with migrations keyed on `PRAGMA user_version`. The fifteen that grew
-  the schema were squashed into one while the project was unshared; a database
-  left at the end of that chain is stamped rather than replayed, and nothing
-  older is carried
+  the schema were squashed into one before the first release

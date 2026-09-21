@@ -88,19 +88,10 @@ MIGRATIONS = [
     """,
 ]
 
-# Fifteen migrations grew this schema while the project was unshared; they were
-# squashed into the one above. A database left at the end of that chain already
-# has the schema, so it is stamped rather than replayed. Nothing older is
-# carried: there was nobody else to carry it for.
-SQUASHED_AT = 15
-
 
 def migrate():
     with connect() as conn:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
-        if version == SQUASHED_AT:
-            conn.execute(f"PRAGMA user_version = {len(MIGRATIONS)}")
-            return
         for i, script in enumerate(MIGRATIONS[version:], start=version):
             conn.executescript(script)
             conn.execute(f"PRAGMA user_version = {i + 1}")
