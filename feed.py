@@ -259,6 +259,47 @@ def follow(owner, url, fetch, platform):
     return jsonify(channel)
 
 
+def import_follows(owner, platform, candidates):
+    """Follow what an export lists, looking nothing up.
+
+    A candidate is (channel_id, url, title), or None for an entry that could not
+    be read. Each channel is dated zero, so the poller takes the fresh ones
+    first; resolving a hundred of them here would be a hundred requests in one
+    breath, which is how an address gets refused.
+    """
+    with connect() as conn:
+        followed = {r["channel_id"] for r in conn.execute(
+            "SELECT channel_id FROM follows WHERE owner = ?", (owner,))}
+    held = followed_count(owner, platform)
+    added, already, skipped, full = 0, 0, 0, False
+    for candidate in candidates:
+        if candidate is None:
+            skipped += 1
+            continue
+        channel_id, url, title = candidate
+        if channel_id in followed:
+            already += 1
+            continue
+        if held >= config.CHANNELS_MAX[platform]:
+            full = True
+            break
+        with connect() as conn:
+            conn.execute("INSERT INTO channels (channel_id, channel_url, title, thumbnail, platform) "
+                         "VALUES (?, ?, ?, '', ?) ON CONFLICT(channel_id) DO NOTHING",
+                         (channel_id, url, title, platform))
+            conn.execute("INSERT OR IGNORE INTO follows (owner, channel_id) VALUES (?, ?)",
+                         (owner, channel_id))
+        followed.add(channel_id)
+        held += 1
+        added += 1
+    if not (added or already or skipped):
+        noun = PROVIDERS[platform]["noun"].lower()
+        return jsonify({"error": f"No {noun}s found in this file"}), 400
+    return jsonify({"added": added, "already": already, "skipped": skipped,
+                    "full": full, "limit": config.CHANNELS_MAX[platform],
+                    "every": config.POLL[platform]})
+
+
 # Started once every provider has registered, which is why this is a call and
 # not a line that runs at import: a poller reaches for everything below it, and
 # one is started per provider whose pages are open. None at all otherwise:
